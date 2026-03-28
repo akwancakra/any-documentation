@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String?
+  /// "admin" | "user"
+  role         String   @default("user")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model LoginLog {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @map("created_at")
+  event       String
+  success     Boolean
+  provider    String
+  sessionId   String   @map("session_id")
+  userId      String?  @map("user_id")
+  userEmail   String?  @map("user_email")
+  userName    String?  @map("user_name")
+  userRole    String?  @map("user_role")
+  requestInfo Json     @map("request_info")
+
+  @@index([createdAt(sort: Desc)])
+  @@index([success, provider])
+  @@map("login_logs")
+}
+
+model FileActivityLog {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now()) @map("created_at")
+  actionType  String   @map("action_type")
+  actorLabel  String   @map("actor_label")
+  targetFile  String?  @map("target_file")
+  targetPath  String?  @map("target_path")
+  fromPath    String?  @map("from_path")
+  toPath      String?  @map("to_path")
+  isDirectory Boolean? @map("is_directory")
+
+  @@index([createdAt(sort: Desc)])
+  @@map("file_activity_logs")
+}

@@ -1,0 +1,36 @@
+# deps
+/node_modules
+
+# generated content
+.contentlayer
+.content-collections
+.source
+/public/assets/files/*
+/public/assets/images/*
+/public/assets/videos/*
+
+# saved files
+/content/docs/*
+!/content/docs/index.mdx
+
+# test & build
+/coverage
+/.next/
+/out/
+/build
+*.tsbuildinfo
+
+# misc
+.DS_Store
+*.pem
+/.pnp
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# others
+.env*.local
+.env
+.vercel
+next-env.d.ts
