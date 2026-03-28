@@ -1,7 +1,7 @@
-# SmartDocs MDX — Comprehensive Project Documentation
+# any-documentation — Comprehensive Project Documentation
 
-> **Stack**: Next.js 14 (App Router) · Node.js (Express/Fastify) · AWS Serverless · Gemini AI  
-> **Target Role**: Cloud Engineer / DevOps Engineer Portfolio Project  
+> **Stack**: Next.js 15 (App Router · Standalone) · Prisma · PostgreSQL (RDS) · AWS ECS Fargate · S3 (docs) · Gemini AI  
+> **Target Role**: Cloud Engineer / DevOps Engineer / QA Engineer Portfolio Project  
 > **Last Updated**: 2026
 
 ---
@@ -11,139 +11,209 @@
 1. [Project Overview](#1-project-overview)
 2. [High-Level Architecture](#2-high-level-architecture)
 3. [Tech Stack & Decision Log](#3-tech-stack--decision-log)
-4. [Phase 1 — Infrastructure as Code (Terraform)](#4-phase-1--infrastructure-as-code-terraform)
-5. [Phase 2 — CI/CD Pipeline (GitHub Actions)](#5-phase-2--cicd-pipeline-github-actions)
-6. [Phase 3 — Security & Production Hardening](#6-phase-3--security--production-hardening)
-7. [Phase 4 — Testing Strategy](#7-phase-4--testing-strategy)
-8. [Monitoring & Observability](#8-monitoring--observability)
-9. [Cost Management & Free Tier Guard](#9-cost-management--free-tier-guard)
-10. [Rollout & Maintenance Plan](#10-rollout--maintenance-plan)
-11. [Local Development Setup](#11-local-development-setup)
-12. [Troubleshooting Guide](#12-troubleshooting-guide)
+4. [Phase 1 — Penyimpanan Dokumen MDX di S3](#4-phase-1--penyimpanan-dokumen-mdx-di-s3)
+5. [Phase 2 — Infrastructure as Code (Terraform)](#5-phase-2--infrastructure-as-code-terraform)
+6. [Phase 3 — CI/CD Pipeline (GitHub Actions)](#6-phase-3--cicd-pipeline-github-actions)
+7. [Phase 4 — Security & Production Hardening](#7-phase-4--security--production-hardening)
+8. [Phase 5 — Testing Strategy (QA Showcase)](#8-phase-5--testing-strategy-qa-showcase)
+9. [Monitoring & Observability](#9-monitoring--observability)
+10. [Cost Management & Free Tier Guard](#10-cost-management--free-tier-guard)
+11. [Rollout & Maintenance Plan](#11-rollout--maintenance-plan)
+12. [Local Development Setup](#12-local-development-setup)
+13. [Troubleshooting Guide](#13-troubleshooting-guide)
+14. [Architecture Decision Records (ADR)](#14-architecture-decision-records-adr)
 
 ---
 
 ## 1. Project Overview
 
-SmartDocs MDX adalah platform dokumentasi berbasis MDX yang ditenagai Gemini AI untuk fitur generate dan improve content. Project ini dirancang sebagai **production-grade portfolio** yang membuktikan kemampuan Cloud Engineering dan DevOps secara end-to-end — bukan sekadar aplikasi biasa, tapi sistem dengan IaC, CI/CD pipeline, security layer, observability, dan automated testing.
+**any-documentation** adalah platform wiki/dokumentasi berbasis MDX dengan editor WYSIWYG, autentikasi admin, dan fitur AI (Gemini) untuk generate & improve konten. Project ini dirancang sebagai **production-grade portfolio** yang membuktikan kemampuan Cloud Engineering, DevOps, dan Quality Assurance secara end-to-end.
 
 ### Goals
 
-| Goal                | Detail                                                     |
-| ------------------- | ---------------------------------------------------------- |
-| **Functional**      | CRUD dokumen MDX, AI-powered content generation via Gemini |
-| **Infrastructure**  | 100% serverless di AWS, eligible free tier selamanya       |
-| **DevOps**          | Pipeline CI/CD otomatis, zero manual deployment            |
-| **Security**        | Least privilege IAM, secrets management, rate limiting     |
-| **Observability**   | CloudWatch dashboard, alarms, dan structured logging       |
-| **Portfolio Value** | Demonstrasi nyata skill Cloud/DevOps ke recruiter          |
+| Goal                | Detail                                                                   |
+| ------------------- | ------------------------------------------------------------------------ |
+| **Functional**      | CRUD dokumen MDX, live rendering, AI-powered content via Gemini          |
+| **Infrastructure**  | Monolith Next.js di AWS ECS Fargate + RDS PostgreSQL + S3 untuk docs MDX |
+| **DevOps**          | Pipeline CI/CD otomatis (GitHub Actions + OIDC), zero manual deployment  |
+| **Security**        | Least privilege IAM, secrets di Secrets Manager, rate limiting, HTTPS    |
+| **Observability**   | CloudWatch Logs, alarms, structured logging                              |
+| **QA Portfolio**    | Piramida testing: unit (Vitest) + E2E (Playwright) + manual checklist    |
+| **Portfolio Value** | Demonstrasi skill Cloud/DevOps/QA nyata ke recruiter                     |
 
-### Why Serverless?
+### Keputusan Arsitektur Utama: Monolith Container (bukan serverless split)
 
-> **Tradeoff yang disadari, bukan dipaksakan.**
+Aplikasi ini menggunakan **Next.js standalone container di ECS Fargate** — bukan static export + Lambda terpisah. Alasannya:
 
-- **Pros**: Lambda 1 juta request/bulan gratis selamanya, auto-scale tanpa server management, biaya hampir nol untuk personal/portfolio use.
-- **Cons**: Cold start Lambda 200–500ms pertama (dapat dimitigasi dengan Provisioned Concurrency jika diperlukan nanti).
-- **Counterpoint**: ECS/Fargate lebih mahal dan butuh lebih banyak management overhead — tidak efisien untuk tahap ini.
+- App membutuhkan **server-side rendering dinamis** (MDX live per-request, NextAuth session, Prisma).
+- **Satu unit deploy** lebih mudah di-debug, di-rollback, dan dijelaskan.
+- **Trade-off yang disadari**: tidak memanfaatkan free tier Lambda, tapi arsitektur lebih representatif untuk aplikasi production nyata.
 
 ---
 
 ## 2. High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        USER / BROWSER                        │
-└─────────────────────────┬───────────────────────────────────┘
-                          │ HTTPS
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│              CloudFront (CDN — Global Edge)                  │
-│         Free Tier: 1 TB transfer/bulan                       │
-└──────────┬──────────────────────────┬───────────────────────┘
-           │ Static Assets            │ API calls
-           ▼                          ▼
-┌──────────────────┐      ┌──────────────────────────────────┐
-│   S3 Bucket      │      │       API Gateway (HTTP API)      │
-│  (Static Site)   │      │   throttling + CORS + WAF basic   │
-│  Next.js export  │      └──────────────┬───────────────────┘
-└──────────────────┘                     │
-                                         ▼
-                          ┌──────────────────────────────────┐
-                          │         AWS Lambda               │
-                          │  ┌────────────────────────────┐  │
-                          │  │  fn: mdx-crud              │  │
-                          │  │  (Node.js/Express handler) │  │
-                          │  │  · Create/Read/Update/Delete│  │
-                          │  │  · MDX parse & validate    │  │
-                          │  │  · Version history logic   │  │
-                          │  └────────────────────────────┘  │
-                          │  ┌────────────────────────────┐  │
-                          │  │  fn: gemini-generate       │  │
-                          │  │  · Prompt construction     │  │
-                          │  │  · Rate limit guard        │  │
-                          │  │  · Error fallback logic    │  │
-                          │  └────────────────────────────┘  │
-                          └──────────┬───────────────────────┘
-                                     │
-               ┌─────────────────────┼──────────────────────┐
-               ▼                     ▼                        ▼
-┌──────────────────┐   ┌─────────────────────┐  ┌──────────────────────┐
-│   S3 Bucket      │   │   DynamoDB Table    │  │  SSM Parameter Store │
-│  (MDX Storage)   │   │   (Metadata)        │  │  GEMINI_API_KEY      │
-│  · Versioning ON │   │   PK: docId         │  │  (SecureString)      │
-│  · Encrypted     │   │   SK: version       │  └──────────────────────┘
-│  · Private       │   │   GSI: tags, author │
-└──────────────────┘   └─────────────────────┘
+┌─────────────────────────────────────────────────┐
+│                   USER / BROWSER                 │
+└──────────────────────┬──────────────────────────┘
+                       │ HTTPS
+                       ▼
+┌─────────────────────────────────────────────────┐
+│          Application Load Balancer (ALB)         │
+│     HTTPS termination · health check · routing   │
+└──────────────────────┬──────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────┐
+│         ECS Fargate — Next.js Standalone         │
+│  ┌───────────────────────────────────────────┐  │
+│  │  App Router                               │  │
+│  │  · /docs/[[...slug]]  — MDX live render   │  │
+│  │  · /editor            — WYSIWYG editor    │  │
+│  │  · /api/*             — Route Handlers    │  │
+│  │  · /api/auth          — NextAuth          │  │
+│  └───────────────────────────────────────────┘  │
+└────────────────┬────────────────┬───────────────┘
+                 │                │
+          ┌──────▼──────┐  ┌──────▼───────────────┐
+          │ RDS Postgres │  │ S3 Bucket (MDX Docs)  │
+          │  · User      │  │  DOCS_STORAGE=s3      │
+          │  · LoginLog  │  │  · content/docs/*.mdx │
+          │  · FileLog   │  │  · folder/.keep       │
+          └─────────────┘  └──────────────────────┘
+                                    │
+                         ┌──────────▼───────────────┐
+                         │  AWS Secrets Manager /    │
+                         │  SSM Parameter Store      │
+                         │  DATABASE_URL             │
+                         │  NEXTAUTH_SECRET          │
+                         │  GEMINI_API_KEY           │
+                         └──────────────────────────┘
 
 Monitoring Layer:
 CloudWatch Logs → CloudWatch Metrics → CloudWatch Alarms → SNS (email alert)
 ```
 
-### Data Flow: Create/Update MDX Document
+### Data Flow: Baca Halaman Docs
 
 ```
-Client → API Gateway → Lambda (mdx-crud)
-                           │
-                           ├─ Validate MDX content
-                           ├─ Write .mdx file → S3 (mdx-storage bucket)
-                           ├─ Write metadata → DynamoDB
-                           └─ Return { docId, version, url }
+Browser → ALB → ECS Task
+                    │
+                    ├─ getDynamicPage(slug) [force-dynamic]
+                    ├─ getDocsStorage().getText(relKey)  ← S3 GetObject
+                    ├─ parse MDX (gray-matter + MDXRemote)
+                    └─ return rendered RSC
+```
+
+### Data Flow: Simpan/Edit Dokumen (Admin)
+
+```
+Browser → ALB → ECS Task → /api/save-file
+                                │
+                                ├─ getDocsStorage().putText(key, body)  ← S3 PutObject
+                                ├─ revalidatePath / revalidateTag
+                                └─ appendActivityLog → RDS
 ```
 
 ### Data Flow: AI Generate Content
 
 ```
-Client → API Gateway → Lambda (gemini-generate)
-                           │
-                           ├─ Read GEMINI_API_KEY dari SSM
-                           ├─ Check rate limit (custom counter di DynamoDB)
-                           ├─ Call Gemini Flash API
-                           ├─ Parse response
-                           └─ Return { generatedContent, tokensUsed }
+Browser → ALB → ECS Task → /api/ai-enhance
+                                │
+                                ├─ Baca GEMINI_API_KEY dari env (inject via Secrets Manager)
+                                ├─ Call Gemini Flash API
+                                └─ Return { enhancedContent }
 ```
 
 ---
 
 ## 3. Tech Stack & Decision Log
 
-| Layer               | Pilihan                                    | Alasan                                                            |
-| ------------------- | ------------------------------------------ | ----------------------------------------------------------------- |
-| **Frontend**        | Next.js 14 App Router                      | SSG/SSR built-in, optimal untuk MDX rendering, SEO-friendly       |
-| **Backend Runtime** | Node.js 20.x                               | Same language dengan frontend, ecosystem Lambda mature            |
-| **API Framework**   | Express (via `@vendia/serverless-express`) | Familiar, mudah diportasi ke Lambda handler                       |
-| **IaC**             | Terraform                                  | Repeatable, versioned, industry standard untuk DevOps portfolio   |
-| **CI/CD**           | GitHub Actions                             | Native GitHub integration, OIDC support, gratis untuk public repo |
-| **Compute**         | AWS Lambda                                 | Serverless, free tier 1M req/bulan                                |
-| **CDN**             | CloudFront                                 | 1TB transfer gratis, global edge, Origin Access Control           |
-| **Storage**         | S3                                         | MDX files + static site, virtually unlimited, murah               |
-| **Database**        | DynamoDB                                   | Serverless, free tier 25GB, no connection pool issue di Lambda    |
-| **Secrets**         | SSM Parameter Store                        | Gratis (Standard tier), integrated IAM, lebih aman dari env var   |
-| **AI Model**        | Gemini Flash (Flash-Lite)                  | Free tier, cukup powerful untuk doc generation                    |
-| **Monitoring**      | CloudWatch                                 | Native AWS, zero setup tambahan                                   |
+| Layer              | Pilihan                          | Alasan                                                                   |
+| ------------------ | -------------------------------- | ------------------------------------------------------------------------ |
+| **Frontend/App**   | Next.js 15 App Router            | SSR + force-dynamic MDX rendering, monolith sederhana, standalone output |
+| **Database**       | PostgreSQL via Prisma            | Relasional (User, LoginLog, FileLog), schema konsisten, Prisma type-safe |
+| **DB Hosting**     | Amazon RDS PostgreSQL            | Managed, backup, encryption, VPC private, kompatibel Prisma              |
+| **Compute**        | ECS Fargate                      | Serverless container, tidak ada server management, scale-down ke 0       |
+| **Load Balancer**  | ALB                              | HTTPS termination, health check, sticky session opsional                 |
+| **Docs Storage**   | S3 (via `DocsStorage` abstraksi) | MDX file persisten lintas task, versioning opsional, enkripsi at-rest    |
+| **Secrets**        | Secrets Manager / SSM            | DATABASE_URL, NEXTAUTH_SECRET, Gemini key — tidak disimpan di image      |
+| **IaC**            | Terraform                        | Reproducible, versioned, industry standard                               |
+| **CI/CD**          | GitHub Actions + OIDC            | Native integration, tanpa static credential, gratis untuk public repo    |
+| **AI Model**       | Gemini Flash / Flash-Lite        | Free tier, powerful untuk content generation                             |
+| **Monitoring**     | CloudWatch                       | Native AWS, zero setup tambahan                                          |
+| **Testing**        | Vitest + Playwright + manual     | Piramida testing untuk showcase QA                                       |
+| **Image Registry** | Amazon ECR                       | Private, native ECS integration, lifecycle policy                        |
 
 ---
 
-## 4. Phase 1 — Infrastructure as Code (Terraform)
+## 4. Phase 1 — Penyimpanan Dokumen MDX di S3
+
+**Status**: Selesai diimplementasikan  
+**Output**: Abstraksi `DocsStorage` dengan adapter `fs` (lokal) dan `s3` (AWS).
+
+### Konsep
+
+Semua baca/tulis file MDX di `content/docs` melewati satu interface terpusat (`DocsStorage`). Backend dipilih lewat env:
+
+- `DOCS_STORAGE=fs` — baca/tulis ke disk lokal (default untuk dev)
+- `DOCS_STORAGE=s3` — baca/tulis ke S3 bucket (untuk prod ECS)
+
+### Struktur Modul
+
+```
+src/lib/docs-storage/
+├── types.ts        # Interface DocsStorage
+├── keys.ts         # Normalisasi key, validasi path traversal, .keep marker
+├── fs-storage.ts   # Implementasi filesystem (dev / single-instance)
+├── s3-storage.ts   # Implementasi S3 (@aws-sdk/client-s3)
+└── index.ts        # getDocsStorage() — singleton + env toggle
+src/lib/
+├── mdx-utils.ts        # getAllMDXFiles, getMDXFileBySlug — via DocsStorage
+├── docs-file-tree.ts   # buildDocsFileTree — FS: readdir; S3: list keys
+└── docs-revalidate.ts  # revalidateDocsContent() terpusat
+```
+
+### Folder Kosong di S3
+
+S3 tidak punya konsep direktori. Saat admin membuat folder baru, sebuah **marker object** `folder/.keep` (0 byte) dibuat. Pohon file di editor dibentuk dari listing key + infal prefix.
+
+### Variabel Environment
+
+```bash
+DOCS_STORAGE=s3
+DOCS_S3_BUCKET=nama-bucket
+DOCS_S3_PREFIX=          # opsional, mis. wiki-docs/
+AWS_REGION=ap-southeast-1
+```
+
+### IAM Task Role (contoh)
+
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "s3:GetObject",
+    "s3:PutObject",
+    "s3:DeleteObject",
+    "s3:ListBucket"
+  ],
+  "Resource": ["arn:aws:s3:::NAMA_BUCKET", "arn:aws:s3:::NAMA_BUCKET/*"]
+}
+```
+
+### Seed Awal Bucket
+
+```bash
+export DOCS_S3_BUCKET=nama-bucket
+./scripts/sync-content-docs-to-s3.sh
+# atau: aws s3 sync ./content/docs s3://NAMA_BUCKET/PREFIX --delete
+```
+
+---
+
+## 5. Phase 2 — Infrastructure as Code (Terraform)
 
 **Estimasi waktu**: 2–3 hari  
 **Output**: Semua AWS resource terprovision secara reproducible dan versioned.
@@ -152,905 +222,359 @@ Client → API Gateway → Lambda (gemini-generate)
 
 ```
 infrastructure/
-├── main.tf              # Resource definitions
-├── variables.tf         # Input variable declarations
-├── terraform.tfvars     # Actual values (gitignored untuk secrets)
-├── outputs.tf           # Output values (API URL, CloudFront domain, dll)
+├── main.tf              # Provider, remote state, resource utama
+├── variables.tf         # Input variables
+├── terraform.tfvars     # Actual values (gitignored)
+├── outputs.tf           # Output: ALB URL, ECR repo, dll
 ├── modules/
-│   ├── lambda/          # Lambda + IAM role
-│   ├── storage/         # S3 + DynamoDB
-│   ├── cdn/             # CloudFront + OAC
-│   └── api/             # API Gateway
-└── .terraform.lock.hcl  # Provider lock file (di-commit ke repo)
+│   ├── network/         # VPC, subnets, security groups
+│   ├── compute/         # ECS cluster, service, task definition, ALB
+│   ├── database/        # RDS PostgreSQL
+│   ├── storage/         # S3 bucket docs, ECR
+│   └── secrets/         # Secrets Manager entries
+└── .terraform.lock.hcl
 ```
 
 ### `variables.tf`
 
 ```hcl
 variable "project_name" {
-  description = "Project name prefix untuk semua resource"
+  description = "Prefix semua resource AWS"
   type        = string
-  default     = "smartdocs-mdx"
+  default     = "any-documentation"
 }
 
 variable "aws_region" {
-  description = "AWS region deployment"
-  type        = string
-  default     = "ap-southeast-1" # Singapore, paling dekat dari Indonesia
+  type    = string
+  default = "ap-southeast-1"
 }
 
 variable "environment" {
-  description = "dev atau prod"
-  type        = string
-  default     = "dev"
+  type    = string
+  default = "dev"
+}
+
+variable "db_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "nextauth_secret" {
+  type      = string
+  sensitive = true
 }
 
 variable "gemini_api_key" {
-  description = "Google Gemini API Key"
-  type        = string
-  sensitive   = true # Tidak di-print di terraform output
+  type      = string
+  sensitive = true
 }
 ```
 
-### `main.tf` — Core Resources
+### Resource Utama
 
 ```hcl
-terraform {
-  required_version = ">= 1.6.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-
-  # Remote state di S3 (buat bucket ini manual sekali saja)
-  backend "s3" {
-    bucket = "smartdocs-terraform-state"
-    key    = "infra/terraform.tfstate"
-    region = "ap-southeast-1"
+# ECR — image registry
+resource "aws_ecr_repository" "app" {
+  name                 = "${var.project_name}-${var.environment}"
+  image_tag_mutability = "MUTABLE"
+  lifecycle_policy {
+    # Simpan hanya 10 image terakhir
+    policy = jsonencode({
+      rules = [{ rulePriority = 1, action = { type = "expire" },
+        selection = { tagStatus = "any", countType = "imageCountMoreThan", countNumber = 10 } }]
+    })
   }
 }
 
-provider "aws" {
-  region = var.aws_region
-  default_tags {
-    tags = {
-      Project     = var.project_name
-      Environment = var.environment
-      ManagedBy   = "Terraform"
-    }
-  }
+# RDS PostgreSQL
+resource "aws_db_instance" "postgres" {
+  identifier        = "${var.project_name}-db-${var.environment}"
+  engine            = "postgres"
+  engine_version    = "16"
+  instance_class    = "db.t3.micro"  # Free tier eligible
+  allocated_storage = 20
+  db_name           = "wikidocs"
+  username          = "wikiuser"
+  password          = var.db_password
+  skip_final_snapshot = true
+  vpc_security_group_ids = [aws_security_group.rds.id]
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+  storage_encrypted      = true
+  backup_retention_period = 7
+  deletion_protection    = false  # set true di prod nyata
 }
 
-# ─────────────────────────────────────────────
-# S3 — Static Frontend (Next.js Export)
-# ─────────────────────────────────────────────
-resource "aws_s3_bucket" "frontend" {
-  bucket = "${var.project_name}-frontend-${var.environment}"
+# S3 — MDX Docs Storage
+resource "aws_s3_bucket" "docs" {
+  bucket = "${var.project_name}-docs-${var.environment}"
 }
 
-resource "aws_s3_bucket_versioning" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
+resource "aws_s3_bucket_versioning" "docs" {
+  bucket = aws_s3_bucket.docs.id
   versioning_configuration { status = "Enabled" }
 }
 
-resource "aws_s3_bucket_public_access_block" "frontend" {
-  bucket                  = aws_s3_bucket.frontend.id
+resource "aws_s3_bucket_server_side_encryption_configuration" "docs" {
+  bucket = aws_s3_bucket.docs.id
+  rule {
+    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "docs" {
+  bucket                  = aws_s3_bucket.docs.id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
 
-# ─────────────────────────────────────────────
-# S3 — MDX File Storage
-# ─────────────────────────────────────────────
-resource "aws_s3_bucket" "mdx_storage" {
-  bucket = "${var.project_name}-mdx-${var.environment}"
+# Secrets Manager
+resource "aws_secretsmanager_secret" "app_secrets" {
+  name = "${var.project_name}/${var.environment}/app"
 }
 
-resource "aws_s3_bucket_versioning" "mdx_storage" {
-  bucket = aws_s3_bucket.mdx_storage.id
-  versioning_configuration { status = "Enabled" }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "mdx_storage" {
-  bucket = aws_s3_bucket.mdx_storage.id
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-# ─────────────────────────────────────────────
-# DynamoDB — Document Metadata
-# ─────────────────────────────────────────────
-resource "aws_dynamodb_table" "docs" {
-  name         = "${var.project_name}-docs-${var.environment}"
-  billing_mode = "PAY_PER_REQUEST" # Free tier: 25 WCU/RCU selamanya
-
-  hash_key  = "docId"
-  range_key = "version"
-
-  attribute {
-    name = "docId"
-    type = "S"
-  }
-
-  attribute {
-    name = "version"
-    type = "N"
-  }
-
-  attribute {
-    name = "author"
-    type = "S"
-  }
-
-  global_secondary_index {
-    name            = "AuthorIndex"
-    hash_key        = "author"
-    projection_type = "ALL"
-  }
-
-  point_in_time_recovery { enabled = true }
-}
-
-# ─────────────────────────────────────────────
-# SSM — Gemini API Key
-# ─────────────────────────────────────────────
-resource "aws_ssm_parameter" "gemini_api_key" {
-  name        = "/${var.project_name}/${var.environment}/GEMINI_API_KEY"
-  type        = "SecureString"
-  value       = var.gemini_api_key
-  description = "Google Gemini API Key untuk Lambda gemini-generate"
-}
-
-# ─────────────────────────────────────────────
-# IAM — Lambda Execution Role (Least Privilege)
-# ─────────────────────────────────────────────
-resource "aws_iam_role" "lambda_exec" {
-  name = "${var.project_name}-lambda-role-${var.environment}"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
-    }]
+resource "aws_secretsmanager_secret_version" "app_secrets" {
+  secret_id = aws_secretsmanager_secret.app_secrets.id
+  secret_string = jsonencode({
+    DATABASE_URL    = "postgresql://wikiuser:${var.db_password}@${aws_db_instance.postgres.endpoint}/wikidocs"
+    NEXTAUTH_SECRET = var.nextauth_secret
+    GEMINI_API_KEY  = var.gemini_api_key
   })
 }
 
-resource "aws_iam_role_policy" "lambda_policy" {
-  name = "${var.project_name}-lambda-policy"
-  role = aws_iam_role.lambda_exec.id
+# ECS Task Role — IAM
+resource "aws_iam_role" "ecs_task" {
+  name = "${var.project_name}-task-role-${var.environment}"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{ Action = "sts:AssumeRole", Effect = "Allow",
+      Principal = { Service = "ecs-tasks.amazonaws.com" } }]
+  })
+}
 
+resource "aws_iam_role_policy" "ecs_task_policy" {
+  name = "${var.project_name}-task-policy"
+  role = aws_iam_role.ecs_task.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        # CloudWatch Logs
-        Effect = "Allow"
-        Action = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+        Resource = [aws_s3_bucket.docs.arn, "${aws_s3_bucket.docs.arn}/*"]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = aws_secretsmanager_secret.app_secrets.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = "arn:aws:logs:*:*:*"
-      },
-      {
-        # S3 MDX Storage — read/write only (bukan delete sembarangan)
-        Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
-        Resource = [
-          aws_s3_bucket.mdx_storage.arn,
-          "${aws_s3_bucket.mdx_storage.arn}/*"
-        ]
-      },
-      {
-        # DynamoDB — CRUD docs table only
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem",
-                    "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
-        Resource = [
-          aws_dynamodb_table.docs.arn,
-          "${aws_dynamodb_table.docs.arn}/index/*"
-        ]
-      },
-      {
-        # SSM — read only parameter yang relevan
-        Effect   = "Allow"
-        Action   = ["ssm:GetParameter"]
-        Resource = aws_ssm_parameter.gemini_api_key.arn
       }
     ]
   })
 }
-
-# ─────────────────────────────────────────────
-# Lambda — CRUD MDX
-# ─────────────────────────────────────────────
-resource "aws_lambda_function" "mdx_crud" {
-  function_name = "${var.project_name}-mdx-crud-${var.environment}"
-  role          = aws_iam_role.lambda_exec.arn
-  runtime       = "nodejs20.x"
-  handler       = "index.handler"
-  filename      = "../backend/dist/mdx-crud.zip"
-  timeout       = 30
-  memory_size   = 256
-
-  environment {
-    variables = {
-      ENVIRONMENT      = var.environment
-      DYNAMODB_TABLE   = aws_dynamodb_table.docs.name
-      S3_MDX_BUCKET    = aws_s3_bucket.mdx_storage.id
-    }
-  }
-}
-
-# ─────────────────────────────────────────────
-# Lambda — Gemini Generate
-# ─────────────────────────────────────────────
-resource "aws_lambda_function" "gemini_generate" {
-  function_name = "${var.project_name}-gemini-generate-${var.environment}"
-  role          = aws_iam_role.lambda_exec.arn
-  runtime       = "nodejs20.x"
-  handler       = "index.handler"
-  filename      = "../backend/dist/gemini-generate.zip"
-  timeout       = 60  # Gemini bisa lambat
-  memory_size   = 256
-
-  environment {
-    variables = {
-      ENVIRONMENT       = var.environment
-      GEMINI_SSM_PATH   = aws_ssm_parameter.gemini_api_key.name
-      GEMINI_MODEL      = "gemini-1.5-flash-8b" # Flash-Lite = paling hemat
-      RATE_LIMIT_TABLE  = aws_dynamodb_table.docs.name
-    }
-  }
-}
-
-# ─────────────────────────────────────────────
-# API Gateway — HTTP API (lebih murah dari REST API)
-# ─────────────────────────────────────────────
-resource "aws_apigatewayv2_api" "main" {
-  name          = "${var.project_name}-api-${var.environment}"
-  protocol_type = "HTTP"
-
-  cors_configuration {
-    allow_headers = ["content-type", "authorization"]
-    allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allow_origins = ["https://your-cloudfront-domain.cloudfront.net"]
-    max_age       = 300
-  }
-}
-
-resource "aws_apigatewayv2_stage" "default" {
-  api_id      = aws_apigatewayv2_api.main.id
-  name        = var.environment
-  auto_deploy = true
-
-  access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.api_gw.arn
-  }
-
-  default_route_settings {
-    throttling_burst_limit = 50
-    throttling_rate_limit  = 100
-  }
-}
-
-# ─────────────────────────────────────────────
-# CloudFront — CDN Frontend
-# ─────────────────────────────────────────────
-resource "aws_cloudfront_origin_access_control" "frontend" {
-  name                              = "${var.project_name}-oac"
-  origin_access_control_origin_type = "s3"
-  signing_behavior                  = "always"
-  signing_protocol                  = "sigv4"
-}
-
-resource "aws_cloudfront_distribution" "frontend" {
-  enabled             = true
-  default_root_object = "index.html"
-  price_class         = "PriceClass_100" # US + Europe edge only (paling murah)
-
-  origin {
-    domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
-    origin_id                = "S3Frontend"
-    origin_access_control_id = aws_cloudfront_origin_access_control.frontend.id
-  }
-
-  default_cache_behavior {
-    target_origin_id       = "S3Frontend"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-
-    forwarded_values {
-      query_string = false
-      cookies { forward = "none" }
-    }
-  }
-
-  restrictions {
-    geo_restriction { restriction_type = "none" }
-  }
-
-  viewer_certificate {
-    cloudfront_default_certificate = true
-  }
-}
-
-# ─────────────────────────────────────────────
-# CloudWatch Log Groups
-# ─────────────────────────────────────────────
-resource "aws_cloudwatch_log_group" "lambda_crud" {
-  name              = "/aws/lambda/${aws_lambda_function.mdx_crud.function_name}"
-  retention_in_days = 7 # Hemat storage
-}
-
-resource "aws_cloudwatch_log_group" "lambda_gemini" {
-  name              = "/aws/lambda/${aws_lambda_function.gemini_generate.function_name}"
-  retention_in_days = 7
-}
-
-resource "aws_cloudwatch_log_group" "api_gw" {
-  name              = "/aws/apigateway/${aws_apigatewayv2_api.main.name}"
-  retention_in_days = 7
-}
 ```
 
-### `outputs.tf`
-
-```hcl
-output "cloudfront_domain" {
-  value       = aws_cloudfront_distribution.frontend.domain_name
-  description = "URL frontend lo"
-}
-
-output "api_gateway_url" {
-  value       = "${aws_apigatewayv2_api.main.api_endpoint}/${var.environment}"
-  description = "Base URL API"
-}
-
-output "mdx_bucket_name" {
-  value = aws_s3_bucket.mdx_storage.id
-}
-
-output "dynamodb_table_name" {
-  value = aws_dynamodb_table.docs.name
-}
-```
-
-### Urutan Eksekusi Terraform
+### Urutan Eksekusi
 
 ```bash
-# 1. Init (download providers)
+# 1. Init
 terraform init
 
-# 2. Validasi syntax
-terraform validate
-
-# 3. Preview perubahan — SELALU jalankan sebelum apply
+# 2. Preview
 terraform plan -var-file="terraform.tfvars"
 
-# 4. Apply (ketik "yes" ketika diminta)
+# 3. Apply
 terraform apply -var-file="terraform.tfvars"
 
-# 5. Lihat outputs
+# 4. Lihat output
 terraform output
 ```
 
-> **Tip**: Simpan `terraform.tfvars` di `.gitignore`. Untuk CI/CD, inject variabel via environment variable (`TF_VAR_gemini_api_key`).
+> **Simpan** `terraform.tfvars` di `.gitignore`. CI/CD inject variabel via env (`TF_VAR_db_password`, dll.).
 
 ---
 
-## 5. Phase 2 — CI/CD Pipeline (GitHub Actions)
+## 6. Phase 3 — CI/CD Pipeline (GitHub Actions)
 
 **Estimasi waktu**: 2 hari  
-**Output**: Setiap `git push` ke `main` otomatis deploy — zero manual error.
+**Output**: Setiap `git push` ke `main` otomatis test → build → deploy.
 
-### Prinsip Desain Pipeline
+### Prinsip Pipeline
 
 ```
-Developer → git push → GitHub Actions trigger
-                           │
-              ┌────────────┴────────────┐
-              ▼                         ▼
-     Frontend Pipeline           Backend Pipeline
-     (next build + S3 sync)     (test → zip → lambda deploy)
-              │                         │
-              ▼                         ▼
-     CloudFront Invalidation    Terraform apply (jika IaC berubah)
-              │                         │
-              └────────────┬────────────┘
-                           ▼
-                    Notify (opsional: Slack/email)
+git push → Actions trigger
+                │
+    ┌───────────┴──────────────┐
+    ▼                          ▼
+test (lint + Vitest)     Playwright E2E (staging)
+    │
+    ▼ (merge ke main)
+build Docker image
+    │
+    ▼
+push ke ECR
+    │
+    ▼
+deploy ECS (rolling update)
+    │
+    ▼
+smoke test production
 ```
 
 ### Setup GitHub Secrets
 
-Navigasi ke `Settings → Secrets and variables → Actions`, tambahkan:
+| Secret           | Nilai                                  |
+| ---------------- | -------------------------------------- |
+| `AWS_ROLE_ARN`   | ARN IAM Role OIDC untuk GitHub Actions |
+| `AWS_REGION`     | `ap-southeast-1`                       |
+| `ECR_REPOSITORY` | URL ECR repo                           |
+| `ECS_CLUSTER`    | Nama cluster ECS                       |
+| `ECS_SERVICE`    | Nama service ECS                       |
+| `DOCS_S3_BUCKET` | Nama bucket MDX docs                   |
 
-| Secret Name                  | Value                                              |
-| ---------------------------- | -------------------------------------------------- |
-| `AWS_ROLE_ARN`               | ARN dari IAM Role OIDC (lihat setup OIDC di bawah) |
-| `AWS_REGION`                 | `ap-southeast-1`                                   |
-| `CLOUDFRONT_DISTRIBUTION_ID` | ID dari output Terraform                           |
-| `TF_VAR_gemini_api_key`      | Gemini API Key lo                                  |
-
-### Setup OIDC (Tidak Ada Static Credential di GitHub)
+### OIDC (Tanpa Static Credential)
 
 ```hcl
-# Tambahkan di main.tf — buat sekali, permanent
 resource "aws_iam_openid_connect_provider" "github" {
-  url = "https://token.actions.githubusercontent.com"
+  url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
 resource "aws_iam_role" "github_actions" {
   name = "${var.project_name}-github-actions-role"
-
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
-      Principal = {
-        Federated = aws_iam_openid_connect_provider.github.arn
-      }
-      Action = "sts:AssumeRoleWithWebIdentity"
+      Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
+      Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:YOUR_GITHUB_USERNAME/YOUR_REPO:*"
+          "token.actions.githubusercontent.com:sub" =
+            "repo:YOUR_USERNAME/YOUR_REPO:*"
         }
       }
     }]
   })
 }
-
-resource "aws_iam_role_policy_attachment" "github_actions_policy" {
-  role       = aws_iam_role.github_actions.name
-  policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess" # Scope down di production
-}
 ```
 
-### `.github/workflows/frontend-deploy.yml`
+### `.github/workflows/deploy.yml`
 
 ```yaml
-name: Deploy Frontend
+name: Test, Build & Deploy
 
 on:
   push:
     branches: [main]
-    paths:
-      - "frontend/**" # Hanya trigger kalau ada perubahan di folder frontend
-      - ".github/workflows/frontend-deploy.yml"
-
-permissions:
-  id-token: write # OIDC — wajib ada
-  contents: read
-
-jobs:
-  deploy:
-    name: Build & Deploy Frontend
-    runs-on: ubuntu-latest
-    environment: production
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install Dependencies
-        working-directory: ./frontend
-        run: npm ci
-
-      - name: Type Check
-        working-directory: ./frontend
-        run: npm run type-check
-
-      - name: Lint
-        working-directory: ./frontend
-        run: npm run lint
-
-      - name: Build Next.js (Static Export)
-        working-directory: ./frontend
-        run: npm run build
-        env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.API_GATEWAY_URL }}
-
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Sync ke S3
-        run: |
-          aws s3 sync ./frontend/out s3://${{ secrets.FRONTEND_BUCKET_NAME }} \
-            --delete \
-            --cache-control "public, max-age=31536000, immutable" \
-            --exclude "*.html"
-
-          # HTML files: jangan di-cache aggressively
-          aws s3 sync ./frontend/out s3://${{ secrets.FRONTEND_BUCKET_NAME }} \
-            --delete \
-            --cache-control "public, max-age=0, must-revalidate" \
-            --include "*.html"
-
-      - name: Invalidate CloudFront Cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
-
-      - name: Deployment Summary
-        run: |
-          echo "✅ Frontend deployed successfully"
-          echo "🌐 URL: https://${{ secrets.CLOUDFRONT_DOMAIN }}"
-```
-
-### `.github/workflows/backend-deploy.yml`
-
-```yaml
-name: Deploy Backend
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - ".github/workflows/backend-deploy.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "backend/**"
 
 permissions:
   id-token: write
   contents: read
-  pull-requests: write # Untuk post comment di PR
+  pull-requests: write
 
 jobs:
-  # ──────────────────────────────────────────
-  # JOB 1: Test (selalu jalan, di PR maupun push)
-  # ──────────────────────────────────────────
   test:
-    name: Run Tests
+    name: Lint + Unit Tests
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run type-check
+      - run: npm run test:unit
 
-      - name: Install Dependencies
-        working-directory: ./backend
-        run: npm ci
-
-      - name: Lint
-        working-directory: ./backend
-        run: npm run lint
-
-      - name: Type Check
-        working-directory: ./backend
-        run: npm run type-check
-
-      - name: Unit & Integration Tests
-        working-directory: ./backend
-        run: npm run test:ci
-        env:
-          NODE_ENV: test
-          # Mock values untuk testing
-          AWS_ACCESS_KEY_ID: test
-          AWS_SECRET_ACCESS_KEY: test
-          AWS_REGION: us-east-1 # localstack/moto default
-
-      - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: backend/coverage/
-
-      - name: Coverage Check (minimal 80%)
-        working-directory: ./backend
-        run: npm run test:coverage-check
-
-      # Post coverage ke PR comment
-      - name: Comment Coverage ke PR
-        if: github.event_name == 'pull_request'
-        uses: ArtiomTr/jest-coverage-report-action@v2
-        with:
-          working-directory: ./backend
-
-  # ──────────────────────────────────────────
-  # JOB 2: Build & Package Lambda
-  # ──────────────────────────────────────────
-  build:
-    name: Build Lambda Packages
+  build-deploy:
+    name: Build Image & Deploy
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: backend/package-lock.json
-
-      - name: Install Production Dependencies
-        working-directory: ./backend
-        run: npm ci --omit=dev
-
-      - name: Build TypeScript
-        working-directory: ./backend
-        run: npm run build
-
-      - name: Package mdx-crud Lambda
-        working-directory: ./backend
-        run: |
-          cd dist
-          zip -r ../mdx-crud.zip . -x "*.test.js"
-          cd ..
-          echo "mdx-crud.zip size: $(du -sh mdx-crud.zip | cut -f1)"
-
-      - name: Package gemini-generate Lambda
-        working-directory: ./backend
-        run: |
-          cd dist
-          zip -r ../gemini-generate.zip . -x "*.test.js"
-          cd ..
-          echo "gemini-generate.zip size: $(du -sh gemini-generate.zip | cut -f1)"
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: lambda-packages
-          path: |
-            backend/mdx-crud.zip
-            backend/gemini-generate.zip
-          retention-days: 1
-
-  # ──────────────────────────────────────────
-  # JOB 3: Deploy ke Dev
-  # ──────────────────────────────────────────
-  deploy-dev:
-    name: Deploy ke Dev
-    needs: build
-    runs-on: ubuntu-latest
-    environment: dev
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download Lambda Packages
-        uses: actions/download-artifact@v4
-        with:
-          name: lambda-packages
-          path: backend/dist/
-
-      - name: Configure AWS Credentials (OIDC)
+      - name: Configure AWS (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Deploy Lambda — mdx-crud
+      - name: Login ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push Image
         run: |
-          aws lambda update-function-code \
-            --function-name smartdocs-mdx-mdx-crud-dev \
-            --zip-file fileb://backend/dist/mdx-crud.zip
+          IMAGE="${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
-      - name: Deploy Lambda — gemini-generate
+      - name: Seed docs S3 (hanya jika ada perubahan di content/docs)
         run: |
-          aws lambda update-function-code \
-            --function-name smartdocs-mdx-gemini-generate-dev \
-            --zip-file fileb://backend/dist/gemini-generate.zip
+          aws s3 sync ./content/docs s3://${{ secrets.DOCS_S3_BUCKET }} --delete
 
-      - name: Wait for Lambda Update
+      - name: Deploy ECS
         run: |
-          aws lambda wait function-updated \
-            --function-name smartdocs-mdx-mdx-crud-dev
-          aws lambda wait function-updated \
-            --function-name smartdocs-mdx-gemini-generate-dev
+          aws ecs update-service \
+            --cluster ${{ secrets.ECS_CLUSTER }} \
+            --service ${{ secrets.ECS_SERVICE }} \
+            --force-new-deployment
 
-      - name: Smoke Test Dev
+      - name: Wait healthy
         run: |
-          API_URL="${{ secrets.API_GATEWAY_URL_DEV }}"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/health")
-          if [ "$STATUS" != "200" ]; then
-            echo "❌ Smoke test failed — HTTP $STATUS"
-            exit 1
-          fi
-          echo "✅ Smoke test passed"
+          aws ecs wait services-stable \
+            --cluster ${{ secrets.ECS_CLUSTER }} \
+            --services ${{ secrets.ECS_SERVICE }}
 
-  # ──────────────────────────────────────────
-  # JOB 4: Deploy ke Prod (dengan manual approval)
-  # ──────────────────────────────────────────
-  deploy-prod:
-    name: Deploy ke Production
-    needs: deploy-dev
-    runs-on: ubuntu-latest
-    environment: production # Environment ini punya required reviewers di GitHub
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download Lambda Packages
-        uses: actions/download-artifact@v4
-        with:
-          name: lambda-packages
-          path: backend/dist/
-
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Deploy ke Production
+      - name: Smoke test
         run: |
-          aws lambda update-function-code \
-            --function-name smartdocs-mdx-mdx-crud-prod \
-            --zip-file fileb://backend/dist/mdx-crud.zip
-
-          aws lambda update-function-code \
-            --function-name smartdocs-mdx-gemini-generate-prod \
-            --zip-file fileb://backend/dist/gemini-generate.zip
-
-      - name: Tag Release
-        run: |
-          git tag "release-$(date +'%Y%m%d-%H%M%S')"
-          git push origin --tags
-
-      - name: Deployment Summary
-        run: echo "🚀 Production deployment selesai — $(date)"
-```
-
-### Pipeline Flow Diagram
-
-```
-git push → Actions trigger
-                │
-                ▼
-        ┌───────────────┐
-        │  Job: test    │ ← Jalan di PR dan push
-        │  · lint       │
-        │  · type-check │
-        │  · unit test  │
-        │  · coverage   │
-        └──────┬────────┘
-               │ ✅ pass
-               ▼ (push to main only)
-        ┌───────────────┐
-        │  Job: build   │
-        │  · tsc build  │
-        │  · zip lambda │
-        └──────┬────────┘
-               │
-               ▼
-        ┌───────────────┐
-        │ deploy-dev    │
-        │ · update fn   │
-        │ · smoke test  │
-        └──────┬────────┘
-               │ ✅ smoke test pass
-               ▼
-        ┌───────────────┐
-        │ deploy-prod   │ ← ⏸ Manual approval required
-        │ · update fn   │
-        │ · tag release │
-        └───────────────┘
+          ALB_URL="${{ secrets.ALB_URL }}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$ALB_URL/api/health")
+          [ "$STATUS" = "200" ] || (echo "Smoke test FAILED: HTTP $STATUS" && exit 1)
+          echo "Smoke test OK"
 ```
 
 ---
 
-## 6. Phase 3 — Security & Production Hardening
+## 7. Phase 4 — Security & Production Hardening
 
 **Estimasi waktu**: 1–2 hari
 
 ### Checklist Security
 
-| Area        | Implementasi                                  | Status   |
-| ----------- | --------------------------------------------- | -------- |
-| IAM         | Least privilege per Lambda function           | Wajib    |
-| Secrets     | Gemini key di SSM SecureString, bukan env var | Wajib    |
-| API Gateway | Throttling (100 req/s, burst 50)              | Wajib    |
-| CORS        | Restrict ke CloudFront domain saja            | Wajib    |
-| S3          | Block public access + OAC untuk CloudFront    | Wajib    |
-| S3          | Server-side encryption (AES-256)              | Wajib    |
-| DynamoDB    | Encryption at rest (default aktif)            | Wajib    |
-| Lambda      | Tidak ada sensitive data di logs              | Wajib    |
-| Gemini      | Rate limit custom logic di Lambda             | Wajib    |
-| WAF         | Basic rule set (OWASP top 10)                 | Opsional |
+| Area           | Implementasi                                             | Status    |
+| -------------- | -------------------------------------------------------- | --------- |
+| IAM            | Least privilege task role (S3 + Secrets Manager only)    | Wajib     |
+| Secrets        | DATABASE_URL, NEXTAUTH_SECRET, Gemini di Secrets Manager | Wajib     |
+| S3 MDX         | Block public access + enkripsi AES-256                   | Wajib     |
+| ALB            | HTTPS only, redirect HTTP → HTTPS                        | Wajib     |
+| RDS            | Private subnet, security group strict (hanya dari ECS)   | Wajib     |
+| Auth           | NextAuth admin-only untuk edit/save/delete               | Sudah ada |
+| Path traversal | `normalizeDocRelKey` menolak `..` sebelum ke storage     | Sudah ada |
+| Logging        | Tidak log `GEMINI_API_KEY`, password, session token      | Wajib     |
+| WAF            | Basic OWASP rule set via AWS WAF (opsional)              | Opsional  |
 
-### Rate Limiter — Gemini API (Lambda Middleware)
-
-```typescript
-// backend/src/middleware/rateLimiter.ts
-import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
-
-const dynamodb = new DynamoDBClient({});
-const RATE_LIMIT_PER_MINUTE = 10; // Konservatif untuk Gemini free tier
-
-export async function checkGeminiRateLimit(userId: string): Promise<boolean> {
-  const windowKey = `ratelimit#${userId}#${Math.floor(Date.now() / 60000)}`;
-
-  try {
-    const result = await dynamodb.send(
-      new UpdateItemCommand({
-        TableName: process.env.DYNAMODB_TABLE!,
-        Key: {
-          docId: { S: windowKey },
-          version: { N: "0" },
-        },
-        UpdateExpression:
-          "ADD #count :inc SET #ttl = if_not_exists(#ttl, :ttl)",
-        ExpressionAttributeNames: {
-          "#count": "requestCount",
-          "#ttl": "expiresAt",
-        },
-        ExpressionAttributeValues: {
-          ":inc": { N: "1" },
-          ":ttl": { N: String(Math.floor(Date.now() / 1000) + 120) }, // TTL 2 menit
-        },
-        ReturnValues: "ALL_NEW",
-      }),
-    );
-
-    const count = parseInt(result.Attributes?.requestCount?.N || "0");
-    return count <= RATE_LIMIT_PER_MINUTE;
-  } catch {
-    // Fail open — jangan block user kalau DynamoDB down
-    return true;
-  }
-}
-```
-
-### Logging — Tidak Log Data Sensitif
+### Logging Aman (contoh)
 
 ```typescript
-// backend/src/utils/logger.ts
-const SENSITIVE_FIELDS = ["apiKey", "password", "token", "prompt", "content"];
+// src/lib/docs-revalidate.ts — tidak ada secret di sini
+// Semua secret hanya di env/container; tidak di log
 
-export function safeLog(
-  level: "info" | "warn" | "error",
-  message: string,
-  data?: Record<string, unknown>,
-) {
-  const sanitized = data ? sanitize(data) : undefined;
-  console[level](
-    JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level,
-      message,
-      ...(sanitized && { data: sanitized }),
-      requestId: process.env.AWS_REQUEST_ID,
-    }),
-  );
-}
-
-function sanitize(obj: Record<string, unknown>): Record<string, unknown> {
+const SENSITIVE_FIELDS = ["apiKey", "password", "token", "secret"];
+function sanitizeForLog(obj: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(obj).map(([k, v]) => [
       k,
@@ -1062,388 +586,202 @@ function sanitize(obj: Record<string, unknown>): Record<string, unknown> {
 }
 ```
 
+### Rate Limit AI Endpoint
+
+Tambahkan middleware pada `/api/ai-enhance`:
+
+```typescript
+// Contoh sederhana in-memory (per instance); untuk multi-instance: DynamoDB counter
+const rateLimitMap = new Map<string, { count: number; window: number }>();
+const LIMIT = 10; // per menit per IP/user
+
+function isRateLimited(key: string): boolean {
+  const now = Math.floor(Date.now() / 60000);
+  const entry = rateLimitMap.get(key);
+  if (!entry || entry.window !== now) {
+    rateLimitMap.set(key, { count: 1, window: now });
+    return false;
+  }
+  if (entry.count >= LIMIT) return true;
+  entry.count++;
+  return false;
+}
+```
+
 ---
 
-## 7. Phase 4 — Testing Strategy
+## 8. Phase 5 — Testing Strategy (QA Showcase)
 
 **Estimasi waktu**: 3–4 hari  
-**Coverage target**: Minimal 80% untuk backend logic.
+**Coverage target**: Minimal 80% untuk logika kritis.
 
 ### Piramida Testing
 
 ```
          ▲
-        /|\
-       / | \        E2E Tests (sedikit)
-      /  |  \       · Playwright — full user flow
+        / \
+       /   \      E2E — Playwright
+      /     \     · Login → buka editor → simpan MDX → verifikasi
      /───────\
-    /         \     Integration Tests (sedang)
-   /           \    · Supertest + aws-sdk-mock
+    /         \   Integration — Vitest + fetch mock
+   /           \  · POST /api/save-file, /api/files, /api/docs/count
   /─────────────\
- /               \  Unit Tests (banyak)
-/─────────────────\ · Jest — pure logic, parsers, validators
+ /               \ Unit — Vitest
+/─────────────────\ · normalizeDocRelKey, buildDocsFileTree, mdx-utils
 ```
 
-### Setup Testing
+### Setup Unit & Integration (Vitest)
 
-```json
-// backend/package.json (testing scripts)
-{
-  "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:ci": "jest --ci --forceExit --coverage",
-    "test:coverage-check": "jest --coverage --coverageThreshold='{\"global\":{\"lines\":80}}'"
+```bash
+npm install -D vitest @vitest/coverage-v8
+```
+
+```typescript
+// vitest.config.ts
+import { defineConfig } from "vitest/config";
+export default defineConfig({
+  test: {
+    environment: "node",
+    coverage: { provider: "v8", threshold: { lines: 80 } },
   },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.d.ts"],
-    "setupFilesAfterFramework": ["<rootDir>/tests/setup.ts"]
-  }
-}
-```
-
-### Unit Test — MDX Validator
-
-```typescript
-// backend/tests/unit/mdxValidator.test.ts
-import { validateMDX, extractFrontmatter } from "../../src/utils/mdxValidator";
-
-describe("MDX Validator", () => {
-  describe("validateMDX", () => {
-    it("valid MDX lolos validasi", () => {
-      const validMDX = `---
-title: Test Doc
-author: john
----
-
-# Hello World
-
-Ini paragraf biasa.
-`;
-      expect(validateMDX(validMDX)).toEqual({ valid: true, errors: [] });
-    });
-
-    it("MDX tanpa frontmatter gagal validasi", () => {
-      const result = validateMDX("# No frontmatter");
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain("Missing frontmatter");
-    });
-
-    it("frontmatter tanpa title gagal validasi", () => {
-      const mdxNoTitle = `---\nauthor: john\n---\n# Content`;
-      const result = validateMDX(mdxNoTitle);
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain("title is required in frontmatter");
-    });
-  });
-
-  describe("extractFrontmatter", () => {
-    it("ekstrak frontmatter dengan benar", () => {
-      const mdx = `---\ntitle: My Doc\nauthor: jane\ntags: [aws, devops]\n---\n# Body`;
-      const result = extractFrontmatter(mdx);
-      expect(result).toMatchObject({
-        title: "My Doc",
-        author: "jane",
-        tags: ["aws", "devops"],
-      });
-    });
-  });
 });
 ```
 
-### Unit Test — Gemini Prompt Builder
+```typescript
+// scripts/verify-docs-storage.ts — sudah ada, jalankan via:
+// npm run verify:docs-storage
+```
+
+**Skenario kritis:**
 
 ```typescript
-// backend/tests/unit/geminiPrompt.test.ts
-import {
-  buildGeneratePrompt,
-  buildImprovePrompt,
-} from "../../src/gemini/promptBuilder";
+// tests/unit/docs-storage-keys.test.ts
+import { normalizeDocRelKey, isFolderKeepKey } from "@/lib/docs-storage/keys";
 
-describe("Gemini Prompt Builder", () => {
-  it("generate prompt mengandung instruksi MDX format", () => {
-    const prompt = buildGeneratePrompt({
-      topic: "AWS Lambda",
-      tone: "technical",
-    });
-    expect(prompt).toContain("MDX");
-    expect(prompt).toContain("frontmatter");
-    expect(prompt).toContain("AWS Lambda");
-  });
+test("menolak path traversal", () => {
+  expect(() => normalizeDocRelKey("../evil")).toThrow();
+});
 
-  it("improve prompt tidak expose konten sensitif", () => {
-    const prompt = buildImprovePrompt({
-      content: "Some content",
-      instruction: "Make it clearer",
-      apiKey: "secret-key-123", // Input yang seharusnya tidak masuk ke prompt
-    } as any);
-    expect(prompt).not.toContain("secret-key-123");
-  });
+test("normalise backslash jadi posix", () => {
+  expect(normalizeDocRelKey("a\\b.mdx")).toBe("a/b.mdx");
+});
 
-  it("prompt panjang > 10000 karakter di-truncate", () => {
-    const longContent = "a".repeat(20000);
-    const prompt = buildImprovePrompt({
-      content: longContent,
-      instruction: "improve",
-    });
-    expect(prompt.length).toBeLessThan(15000);
-  });
+test("mengenali .keep marker", () => {
+  expect(isFolderKeepKey("guide/.keep")).toBe(true);
+  expect(isFolderKeepKey("guide/page.mdx")).toBe(false);
 });
 ```
 
-### Integration Test — CRUD Endpoint (dengan aws-sdk-mock)
+### Setup E2E (Playwright)
+
+```bash
+npm install -D @playwright/test
+npx playwright install
+```
 
 ```typescript
-// backend/tests/integration/mdxCrud.test.ts
-import request from "supertest";
-import { mockClient } from "aws-sdk-client-mock";
-import {
-  DynamoDBClient,
-  PutItemCommand,
-  GetItemCommand,
-} from "@aws-sdk/client-dynamodb";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import app from "../../src/app";
+// tests/e2e/editor.spec.ts
+import { test, expect } from "@playwright/test";
 
-const ddbMock = mockClient(DynamoDBClient);
-const s3Mock = mockClient(S3Client);
+test("admin dapat buat dan lihat dokumen baru", async ({ page }) => {
+  await page.goto("/login");
+  await page.fill('[name="email"]', process.env.SEED_ADMIN_EMAIL!);
+  await page.fill('[name="password"]', process.env.SEED_ADMIN_PASSWORD!);
+  await page.click('button[type="submit"]');
 
-beforeEach(() => {
-  ddbMock.reset();
-  s3Mock.reset();
-});
-
-describe("POST /docs", () => {
-  it("berhasil create dokumen baru", async () => {
-    // Mock DynamoDB dan S3 response
-    ddbMock.on(PutItemCommand).resolves({});
-    s3Mock.on(PutObjectCommand).resolves({ ETag: '"abc123"' });
-
-    const response = await request(app)
-      .post("/docs")
-      .send({
-        title: "Test Document",
-        author: "john",
-        content: "---\ntitle: Test\nauthor: john\n---\n# Hello",
-      })
-      .expect(201);
-
-    expect(response.body).toMatchObject({
-      docId: expect.any(String),
-      version: 1,
-      message: "Document created successfully",
-    });
-  });
-
-  it("return 400 jika MDX content tidak valid", async () => {
-    const response = await request(app)
-      .post("/docs")
-      .send({
-        title: "Test",
-        author: "john",
-        content: "invalid no frontmatter",
-      })
-      .expect(400);
-
-    expect(response.body.error).toContain("Invalid MDX");
-  });
-
-  it("return 429 jika rate limit Gemini tercapai", async () => {
-    // Simulate rate limit exceeded
-    ddbMock.on(GetItemCommand).resolves({
-      Item: { requestCount: { N: "15" } }, // Di atas limit 10
-    });
-
-    const response = await request(app)
-      .post("/ai/generate")
-      .send({ topic: "AWS" })
-      .expect(429);
-
-    expect(response.body.error).toContain("Rate limit");
-  });
+  await page.goto("/editor/create");
+  await page.fill('[data-testid="title-input"]', "Test Halaman E2E");
+  await page.click('[data-testid="save-btn"]');
+  await expect(page.locator("text=Test Halaman E2E")).toBeVisible();
 });
 ```
 
 ### Manual Testing Checklist
 
-Jalankan setelah deploy ke dev stage:
-
 ```markdown
+## Auth
+
+- [ ] Login admin valid → masuk dashboard
+- [ ] Login salah password → error jelas
+- [ ] Akses /editor tanpa login → redirect /login
+
 ## CRUD MDX
 
-- [ ] POST /docs — create dokumen baru
-- [ ] GET /docs/:id — baca dokumen
-- [ ] PUT /docs/:id — update konten
-- [ ] DELETE /docs/:id — hapus dokumen
-- [ ] GET /docs/:id?version=1 — baca versi spesifik (version history)
+- [ ] Buat dokumen baru → muncul di /docs
+- [ ] Edit konten → perubahan tampil tanpa rebuild image
+- [ ] Hapus dokumen → hilang dari sidebar
+- [ ] Rename/pindah folder → path URL ikut berubah
 
 ## AI Feature
 
-- [ ] POST /ai/generate — generate dokumen baru dari topik
-- [ ] POST /ai/improve — improve section tertentu
-- [ ] Test dengan prompt yang sangat panjang (>5000 karakter)
-- [ ] Test ketika Gemini API key salah — proper error message?
-- [ ] Test rate limit — hit endpoint >10x/menit — return 429?
-
-## Performance
-
-- [ ] Artillery load test: 20 concurrent users selama 30 detik
-- [ ] Lambda cold start < 1 detik (warm: < 200ms)
-- [ ] CloudFront cache hit untuk static assets
+- [ ] Enhance teks → Gemini memberikan respons
+- [ ] Prompt kosong → error yang jelas
+- [ ] Hit >10x/menit → 429 rate limit
 
 ## Security
 
-- [ ] Coba akses S3 bucket langsung (harus 403)
-- [ ] Coba request tanpa CORS origin yang benar (harus ditolak)
-- [ ] Inject SQL/NoSQL injection di parameter (harus sanitized)
-- [ ] Kirim prompt injection ke AI endpoint
+- [ ] Coba akses S3 bucket langsung → 403
+- [ ] Path `../../etc/passwd` di filePath API → 403
+- [ ] Request save tanpa auth → 401
 
-## Cross-Browser
+## Performance
 
-- [ ] Chrome, Firefox, Safari
-- [ ] Mobile (iOS Safari, Android Chrome)
-```
-
-### Artillery Load Test Config
-
-```yaml
-# backend/tests/load/artillery.yml
-config:
-  target: "https://your-api-gateway-url/dev"
-  phases:
-    - duration: 30
-      arrivalRate: 5 # 5 user/detik selama 30 detik = 150 total request
-    - duration: 30
-      arrivalRate: 20 # Spike ke 20 user/detik
-  defaults:
-    headers:
-      Content-Type: "application/json"
-
-scenarios:
-  - name: CRUD Flow
-    flow:
-      - post:
-          url: "/docs"
-          json:
-            title: "Load Test Doc"
-            author: "artillery"
-            content: '---\ntitle: Load Test\nauthor: artillery\n---\n# Test'
-          capture:
-            - json: "$.docId"
-              as: "docId"
-      - get:
-          url: "/docs/{{ docId }}"
+- [ ] Halaman /docs load < 2 detik (warm request)
+- [ ] Simpan dokumen → halaman update tanpa full reload
 ```
 
 ---
 
-## 8. Monitoring & Observability
+## 9. Monitoring & Observability
 
-### CloudWatch Dashboard
+### CloudWatch Log Groups
 
 ```hcl
-# infrastructure/monitoring.tf
-resource "aws_cloudwatch_dashboard" "main" {
-  dashboard_name = "${var.project_name}-dashboard-${var.environment}"
+resource "aws_cloudwatch_log_group" "ecs" {
+  name              = "/ecs/${var.project_name}-${var.environment}"
+  retention_in_days = 7
+}
 
-  dashboard_body = jsonencode({
-    widgets = [
-      {
-        type = "metric"
-        properties = {
-          title  = "Lambda Invocations"
-          metrics = [
-            ["AWS/Lambda", "Invocations", "FunctionName", "${var.project_name}-mdx-crud-${var.environment}"],
-            ["AWS/Lambda", "Invocations", "FunctionName", "${var.project_name}-gemini-generate-${var.environment}"]
-          ]
-          period = 300
-          stat   = "Sum"
-        }
-      },
-      {
-        type = "metric"
-        properties = {
-          title  = "Lambda Errors"
-          metrics = [
-            ["AWS/Lambda", "Errors", "FunctionName", "${var.project_name}-mdx-crud-${var.environment}"],
-            ["AWS/Lambda", "Errors", "FunctionName", "${var.project_name}-gemini-generate-${var.environment}"]
-          ]
-          period = 300
-          stat   = "Sum"
-        }
-      },
-      {
-        type = "metric"
-        properties = {
-          title  = "Lambda Duration (P95)"
-          metrics = [
-            ["AWS/Lambda", "Duration", "FunctionName", "${var.project_name}-mdx-crud-${var.environment}"]
-          ]
-          period = 300
-          stat   = "p95"
-        }
-      },
-      {
-        type = "metric"
-        properties = {
-          title  = "API Gateway Requests & 4xx/5xx"
-          metrics = [
-            ["AWS/ApiGateway", "Count", "ApiId", aws_apigatewayv2_api.main.id],
-            ["AWS/ApiGateway", "4XXError", "ApiId", aws_apigatewayv2_api.main.id],
-            ["AWS/ApiGateway", "5XXError", "ApiId", aws_apigatewayv2_api.main.id]
-          ]
-          period = 300
-          stat   = "Sum"
-        }
-      }
-    ]
-  })
+resource "aws_cloudwatch_log_group" "alb" {
+  name              = "/alb/${var.project_name}-${var.environment}"
+  retention_in_days = 7
 }
 ```
 
 ### CloudWatch Alarms
 
 ```hcl
-# infrastructure/alarms.tf
-
-# Alarm: Lambda error rate > 5%
-resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
-  alarm_name          = "${var.project_name}-lambda-errors-${var.environment}"
+# ALB 5xx error rate > 5%
+resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
+  alarm_name          = "${var.project_name}-alb-5xx-${var.environment}"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
-  metric_name         = "Errors"
-  namespace           = "AWS/Lambda"
+  metric_name         = "HTTPCode_Target_5XX_Count"
+  namespace           = "AWS/ApplicationELB"
   period              = 300
   statistic           = "Sum"
   threshold           = 5
-  alarm_description   = "Lambda error count > 5 dalam 10 menit"
   alarm_actions       = [aws_sns_topic.alerts.arn]
-
-  dimensions = {
-    FunctionName = aws_lambda_function.mdx_crud.function_name
-  }
 }
 
-# Alarm: Lambda duration > 5 detik
-resource "aws_cloudwatch_metric_alarm" "lambda_duration" {
-  alarm_name          = "${var.project_name}-lambda-duration-${var.environment}"
+# ECS task CPU > 80%
+resource "aws_cloudwatch_metric_alarm" "ecs_cpu" {
+  alarm_name          = "${var.project_name}-ecs-cpu-${var.environment}"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 3
-  metric_name         = "Duration"
-  namespace           = "AWS/Lambda"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/ECS"
   period              = 300
-  extended_statistic  = "p95"
-  threshold           = 5000 # 5 detik
+  statistic           = "Average"
+  threshold           = 80
   alarm_actions       = [aws_sns_topic.alerts.arn]
 
   dimensions = {
-    FunctionName = aws_lambda_function.gemini_generate.function_name
+    ClusterName = aws_ecs_cluster.main.name
+    ServiceName = aws_ecs_service.app.name
   }
 }
 
-# SNS Topic untuk alerting
 resource "aws_sns_topic" "alerts" {
   name = "${var.project_name}-alerts-${var.environment}"
 }
@@ -1455,61 +793,55 @@ resource "aws_sns_topic_subscription" "email" {
 }
 ```
 
-### CloudWatch Logs Insights — Query Siap Pakai
+### CloudWatch Logs Insights
 
 ```sql
--- Cari Gemini API error dalam 1 jam terakhir
-fields @timestamp, message, data.error
-| filter level = "error" and message like "Gemini"
+-- Error pada API docs
+fields @timestamp, @message
+| filter @message like /ERROR/
+| filter @log like /ecs/
 | sort @timestamp desc
 | limit 20
 
--- Hitung rata-rata latency per endpoint
-fields @timestamp, data.path, data.duration
-| filter level = "info" and ispresent(data.duration)
-| stats avg(data.duration) as avgMs, count() as requests by data.path
-| sort avgMs desc
-
--- Deteksi rate limit hits
-fields @timestamp, data.userId
-| filter message = "Rate limit exceeded"
-| stats count() as hits by data.userId
-| sort hits desc
+-- Latency tinggi
+fields @timestamp, @message
+| filter @message like /save-file/
+| parse @message "duration=*ms" as latency
+| stats avg(latency) as avgMs
 ```
 
 ---
 
-## 9. Cost Management & Free Tier Guard
+## 10. Cost Management & Free Tier Guard
 
-### Estimasi Biaya Bulanan
+### Estimasi Biaya Bulanan (portfolio/dev)
 
-| Service             | Free Tier              | Estimasi Usage     | Estimasi Biaya      |
-| ------------------- | ---------------------- | ------------------ | ------------------- |
-| Lambda              | 1M req + 400K GB-s     | ~5K req, ~50K GB-s | **$0**              |
-| API Gateway (HTTP)  | 1M req                 | ~5K req            | **$0**              |
-| S3                  | 5 GB storage, 20K GET  | ~100 MB, ~500 GET  | **$0**              |
-| CloudFront          | 1 TB transfer, 10M req | ~1 GB, ~5K req     | **$0**              |
-| DynamoDB            | 25 GB, 25 WCU/RCU      | ~10 MB             | **$0**              |
-| CloudWatch Logs     | 5 GB ingest            | ~100 MB            | **$0**              |
-| SSM Parameter Store | Standard gratis        | 1 parameter        | **$0**              |
-| **Total**           |                        |                    | **< Rp5.000/bulan** |
+| Service             | Free Tier / Catatan           | Estimasi Usage        | Biaya             |
+| ------------------- | ----------------------------- | --------------------- | ----------------- |
+| ECS Fargate         | Tidak ada free tier           | 0.25 vCPU, 0.5 GB RAM | ~$5–10/bulan      |
+| RDS db.t3.micro     | 750 jam/bulan free (12 bulan) | 1 instance            | $0 (free tier)    |
+| S3 Docs             | 5 GB, 20K GET free            | ~50 MB, ~500 req      | $0                |
+| ALB                 | Tidak ada free tier           | ~$16/bulan minimum    | ~$16              |
+| CloudWatch Logs     | 5 GB ingest free              | ~100 MB               | $0                |
+| ECR                 | 500 MB/bulan free             | ~200 MB               | $0                |
+| Secrets Manager     | $0.40/secret/bulan            | 1 secret              | ~$0.40            |
+| **Total perkiraan** |                               |                       | **~$20–30/bulan** |
 
-> Gemini Flash-Lite: Free tier cukup untuk portfolio/testing. Monitor di Google AI Studio.
+> **Tip**: Untuk menghemat: gunakan **App Runner** ($0 saat tidak ada traffic) sebagai alternatif ALB + ECS; atau matikan ECS service saat tidak dipakai.
 
-### AWS Budget Alert
+### Budget Alert
 
 ```hcl
-# infrastructure/budget.tf
 resource "aws_budgets_budget" "monthly" {
   name         = "${var.project_name}-budget"
   budget_type  = "COST"
-  limit_amount = "2"
+  limit_amount = "35"
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
   notification {
     comparison_operator        = "GREATER_THAN"
-    threshold                  = 80  # Alert di 80% (= $1.6)
+    threshold                  = 80
     threshold_type             = "PERCENTAGE"
     notification_type          = "ACTUAL"
     subscriber_email_addresses = ["your-email@gmail.com"]
@@ -1519,198 +851,216 @@ resource "aws_budgets_budget" "monthly" {
 
 ---
 
-## 10. Rollout & Maintenance Plan
+## 11. Rollout & Maintenance Plan
 
 ### Deploy Sequence
 
 ```
-1. Terraform apply (IaC) → dev environment
-2. Backend deploy → dev Lambda
-3. Frontend deploy → dev S3 + CloudFront
-4. Manual testing checklist → dev stage
-5. Approval → production deploy
-6. Smoke test production
-7. Monitor CloudWatch 15 menit pertama
+1. terraform apply (IaC) → dev environment
+2. aws s3 sync content/docs → bucket docs
+3. prisma migrate deploy → RDS
+4. docker build + push ECR
+5. ECS rolling update
+6. Smoke test /api/health
+7. Manual testing checklist
+8. Approval → pipeline prod (jika ada multi-env)
+9. Monitor CloudWatch 15 menit pertama
 ```
 
 ### Rollback Procedures
 
 ```bash
-# Rollback Lambda ke versi sebelumnya
-aws lambda update-alias \
-  --function-name smartdocs-mdx-mdx-crud-prod \
-  --name LIVE \
-  --function-version <previous-version-number>
+# Rollback ECS ke image sebelumnya
+aws ecs update-service \
+  --cluster CLUSTER_NAME \
+  --service SERVICE_NAME \
+  --task-definition TASK_DEF_ARN_PREVIOUS
 
-# Rollback Terraform (destroy dan re-apply dari state yang lebih lama)
+# Rollback MDX docs ke S3 versi sebelumnya (jika versioning enabled)
+aws s3api list-object-versions --bucket BUCKET --prefix path/ke/file.mdx
+aws s3api get-object --bucket BUCKET --key path/ke/file.mdx \
+  --version-id VERSION_ID restored-file.mdx
+
+# Rollback Terraform
 terraform state list
-terraform apply -target=aws_lambda_function.mdx_crud -var-file="terraform.tfvars"
-
-# Rollback frontend (re-sync versi S3 sebelumnya via GitHub Actions re-run)
-# GitHub Actions → pilih workflow run sebelumnya → Re-run jobs
+terraform apply -target=aws_ecs_service.app -var-file="terraform.tfvars"
 ```
 
 ### Future Improvements (Roadmap)
 
-| Priority | Feature                        | Catatan                               |
-| -------- | ------------------------------ | ------------------------------------- |
-| High     | Cognito Authentication         | User management proper                |
-| Medium   | Lambda Provisioned Concurrency | Eliminasi cold start                  |
-| Medium   | Blue-Green Deployment          | Zero-downtime deploy via Lambda alias |
-| Low      | OpenSearch                     | Full-text search MDX content          |
-| Low      | AWS X-Ray                      | Distributed tracing                   |
+| Priority | Feature                          | Catatan                                             |
+| -------- | -------------------------------- | --------------------------------------------------- |
+| High     | Playwright E2E di CI             | Jalan saat staging deploy                           |
+| Medium   | App Runner sebagai alternatif    | Lebih murah untuk portfolio, scale to zero          |
+| Medium   | S3 versioning untuk rollback MDX | Sudah diaktifkan di Terraform, tinggal pakai        |
+| Low      | OpenSearch / full-text search    | Search MDX content lebih powerful dari string match |
+| Low      | AWS X-Ray                        | Distributed tracing per request                     |
+| Low      | Cognito                          | Jika ingin multi-user publik (saat ini admin only)  |
 
 ---
 
-## 11. Local Development Setup
+## 12. Local Development Setup
 
 ```bash
 # Prerequisites
 node --version    # >= 20.x
 terraform --version  # >= 1.6.0
-aws --version     # >= 2.x
+aws --version     # >= 2.x (untuk sync S3 saat dev dengan DOCS_STORAGE=s3)
 
 # 1. Clone repo
-git clone https://github.com/YOUR_USERNAME/smartdocs-mdx
-cd smartdocs-mdx
+git clone https://github.com/YOUR_USERNAME/cys-fumadocs
+cd cys-fumadocs
 
-# 2. Setup backend
-cd backend
-cp .env.example .env.local
-# Edit .env.local: isi AWS credentials untuk lokal (pakai profile, bukan key langsung)
+# 2. Install dependencies
 npm install
-npm run dev  # Express server di localhost:3001
 
-# 3. Setup frontend
-cd ../frontend
+# 3. Setup env
 cp .env.example .env.local
-# NEXT_PUBLIC_API_URL=http://localhost:3001
-npm install
-npm run dev  # Next.js di localhost:3000
+# Edit .env.local — isi DATABASE_URL, NEXTAUTH_SECRET, dll.
 
-# 4. Terraform (hanya untuk provision infrastructure)
-cd ../infrastructure
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars: isi gemini_api_key
-terraform init
-terraform plan
+# 4. Setup database lokal
+docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=wiki -e POSTGRES_USER=wiki -e POSTGRES_DB=wiki postgres:16
+npm run db:migrate
+npm run db:seed
+
+# 5. Jalankan dev server
+npm run dev
 ```
 
-### Environment Variables
+### Environment Variables Lengkap
 
 ```bash
-# backend/.env.example
-NODE_ENV=development
-PORT=3001
-AWS_REGION=ap-southeast-1
-AWS_PROFILE=smartdocs-dev      # Pakai AWS profile, bukan raw key
-DYNAMODB_TABLE=smartdocs-mdx-docs-dev
-S3_MDX_BUCKET=smartdocs-mdx-mdx-dev
-GEMINI_MODEL=gemini-1.5-flash-8b
-# Di lokal, bisa hardcode untuk dev. Di Lambda, dibaca dari SSM.
-GEMINI_API_KEY=your-key-here
+# === Database ===
+DATABASE_URL=postgresql://wiki:wiki@localhost:5432/wiki?schema=public
 
-# frontend/.env.example
-NEXT_PUBLIC_API_URL=http://localhost:3001
+# === NextAuth ===
+NEXTAUTH_SECRET=your-secret-here
+NEXTAUTH_URL=http://localhost:3000
+
+# === Docs Storage ===
+# Lokal: tidak perlu diisi (default fs)
+# DOCS_STORAGE=s3
+# DOCS_S3_BUCKET=nama-bucket
+# DOCS_S3_PREFIX=
+# AWS_REGION=ap-southeast-1
+
+# === AI (Gemini) ===
+# AI_ENHANCE_ORDER=gemini
+# GEMINI_API_KEY=
+# GEMINI_AI_MODEL=gemini-2.0-flash-exp
+
+# === Seed admin ===
+SEED_ADMIN_EMAIL=admin@example.com
+SEED_ADMIN_PASSWORD=changeme123
+
+# === Runtime ===
+NODE_ENV=development
+TIMEZONE=Asia/Jakarta
 ```
 
 ---
 
-## 12. Troubleshooting Guide
+## 13. Troubleshooting Guide
 
-### Lambda Cold Start Tinggi
+### ECS Task Restart Loop
 
-**Symptom**: Request pertama lambat (>1 detik).  
-**Cause**: Lambda initialize runtime dari scratch.  
+**Symptom**: Task terus restart, health check gagal.  
 **Fix**:
 
 ```bash
-# Cek duration di CloudWatch
-aws logs filter-log-events \
-  --log-group-name "/aws/lambda/smartdocs-mdx-mdx-crud-dev" \
-  --filter-pattern "Init Duration"
+# Cek log task
+aws logs get-log-events \
+  --log-group-name "/ecs/any-documentation-dev" \
+  --log-stream-name "ecs/app/TASK_ID" \
+  --limit 50
 
-# Solusi jangka pendek: kurangi dependency di Lambda package
-# Solusi jangka panjang: Enable Provisioned Concurrency (bayar per jam)
+# Cek env yang hilang (mis. DATABASE_URL tidak di-inject)
+aws ecs describe-task-definition --task-definition any-documentation-dev \
+  | jq '.taskDefinition.containerDefinitions[].environment'
 ```
+
+### RDS Connection Refused
+
+**Symptom**: `Can't reach database server`.  
+**Cause**: Security group tidak allow dari ECS security group, atau DATABASE_URL salah.  
+**Fix**: Pastikan inbound RDS SG mengizinkan port 5432 dari SG ECS task.
 
 ### Gemini API Error 429
 
 **Symptom**: `429 Too Many Requests` dari Gemini.  
-**Cause**: Free tier limit tercapai (15–60 RPM tergantung model).  
 **Fix**:
 
 ```bash
-# 1. Cek model yang dipakai — ganti ke yang lebih hemat
-GEMINI_MODEL=gemini-1.5-flash-8b  # Paling murah quota-nya
+# Ganti ke model yang lebih hemat quota
+GEMINI_AI_MODEL=gemini-1.5-flash-8b
 
-# 2. Enable retry dengan exponential backoff di Lambda
-# 3. Monitor usage di: https://aistudio.google.com/app/apikey
+# Monitor: https://aistudio.google.com/app/apikey
+```
+
+### Konten MDX Tidak Update Setelah Simpan
+
+**Symptom**: Simpan via editor tapi halaman `/docs/...` masih lama.  
+**Cause**: Revalidasi gagal, atau akses S3 gagal (IAM).  
+**Fix**:
+
+```bash
+# Cek log ECS: apakah save-file return 200?
+# Cek IAM task role: apakah ada s3:PutObject?
+aws iam simulate-principal-policy \
+  --policy-source-arn TASK_ROLE_ARN \
+  --action-names s3:PutObject \
+  --resource-arns "arn:aws:s3:::BUCKET/*"
 ```
 
 ### Terraform State Conflict
 
 **Symptom**: `Error: state is locked`.  
-**Cause**: Pipeline sebelumnya crash di tengah jalan.  
 **Fix**:
 
 ```bash
-# Lihat siapa yang lock
 terraform force-unlock <LOCK_ID>
-# LOCK_ID ada di error message
-
-# Atau via AWS console: S3 → terraform-state bucket → terraform.tfstate.lock
 ```
-
-### CloudFront Tidak Update Setelah Deploy
-
-**Symptom**: Frontend lama masih tampil setelah deploy.  
-**Cause**: CloudFront cache belum expired.  
-**Fix**:
-
-```bash
-aws cloudfront create-invalidation \
-  --distribution-id YOUR_DIST_ID \
-  --paths "/*"
-
-# Cek status invalidation
-aws cloudfront list-invalidations --distribution-id YOUR_DIST_ID
-```
-
-### DynamoDB Throttling
-
-**Symptom**: `ProvisionedThroughputExceededException`.  
-**Cause**: Terlalu banyak request ke DynamoDB (jarang terjadi di free tier).  
-**Fix**: Billing mode `PAY_PER_REQUEST` (sudah di-set di Terraform) tidak ada throttling — kalau masih terjadi, cek ada loop yang tidak sengaja di Lambda.
 
 ---
 
-## Architecture Decision Records (ADR)
+## 14. Architecture Decision Records (ADR)
 
-### ADR-001: Serverless vs Container (ECS/Fargate)
+### ADR-001: Monolith Container vs Serverless Lambda
 
-**Keputusan**: Serverless (Lambda + API Gateway)  
-**Alasan**: Free tier cukup untuk portfolio, zero server management, auto-scale.  
-**Tradeoff diterima**: Cold start latency 200–500ms (dapat dimitigasi jika perlu).
+**Keputusan**: Monolith Next.js standalone di ECS Fargate  
+**Alasan**: Aplikasi membutuhkan SSR dinamis (MDX live, NextAuth session, Prisma), satu unit deploy lebih mudah di-debug. Aplikasi ini bukan static site + API terpisah.  
+**Tradeoff diterima**: Tidak ada free tier untuk ECS Fargate (biaya minimal ~$20/bulan); Lambda lebih murah tapi membutuhkan arsitektur terpisah yang tidak sesuai dengan Next.js App Router yang ada.
 
-### ADR-002: DynamoDB vs RDS
+### ADR-002: RDS PostgreSQL vs DynamoDB
 
-**Keputusan**: DynamoDB  
-**Alasan**: Serverless, free tier 25GB, tidak ada connection pool issue di Lambda environment.  
-**Tradeoff diterima**: Query flexibility lebih terbatas dibanding SQL — dikompensasi dengan GSI yang tepat.
+**Keputusan**: RDS PostgreSQL (via Prisma)  
+**Alasan**: Data sudah relasional (User, LoginLog, FileLog); Prisma sudah terintegrasi; migrasi schema mudah; free tier db.t3.micro 12 bulan pertama.  
+**Tradeoff diterima**: Perlu connection pooling (PgBouncer/RDS Proxy) jika scale banyak instance; untuk portfolio cukup dengan connection limit Prisma.
 
-### ADR-003: HTTP API Gateway vs REST API Gateway
+### ADR-003: S3 untuk MDX vs EFS
 
-**Keputusan**: HTTP API (v2)  
-**Alasan**: 70% lebih murah dari REST API, latency lebih rendah, cukup fiturnya untuk use case ini.  
-**Tradeoff diterima**: Tidak ada built-in request validation model — validasi dilakukan di Lambda.
+**Keputusan**: S3 (via abstraksi `DocsStorage`)  
+**Alasan**: Lebih murah, lebih cloud-native, versioning built-in, tidak butuh NFS mount. Abstraksi memudahkan swap ke `fs` saat lokal.  
+**Tradeoff diterima**: Folder kosong butuh marker `.keep`; tidak ada `rename` atomik di S3 (copy + delete).
 
-### ADR-004: Terraform vs AWS SAM/CDK
+### ADR-004: DocsStorage Abstraction
+
+**Keputusan**: Interface terpusat dengan adapter `fs` dan `s3`  
+**Alasan**: Satu perubahan env mengubah seluruh behavior storage tanpa mengubah kode bisnis. Developer lokal tetap pakai `fs`, prod pakai `s3`.  
+**Tradeoff diterima**: Sedikit lebih verbose dari akses `fs` langsung; adapter S3 butuh `@aws-sdk/client-s3`.
+
+### ADR-005: MDX Content Live vs Baked at Build
+
+**Keputusan**: `force-dynamic` + baca dari storage per-request  
+**Alasan**: Konten MDX bisa berubah lewat editor setelah image di-build; SSG tidak cocok.  
+**Tradeoff diterima**: Setiap request ke `/docs` memerlukan S3 `GetObject` / `ListObjectsV2`; untuk wiki kecil ini acceptable. `React.cache` meminimalkan duplikasi per-request.
+
+### ADR-006: Terraform vs CDK
 
 **Keputusan**: Terraform  
-**Alasan**: Multi-cloud portable, industry standard di DevOps job market, komunitas dan dokumentasi lebih mature.  
-**Tradeoff diterima**: Lebih verbose dibanding SAM untuk Lambda-specific resources.
+**Alasan**: Multi-cloud portable, industry standard di DevOps job market, komunitas mature.  
+**Tradeoff diterima**: Lebih verbose dibanding CDK untuk resource container.
 
 ---
 
-_Dokumentasi ini merupakan living document — update setiap kali ada perubahan arsitektur atau keputusan teknis baru._
+_Dokumen ini adalah living document — update setiap kali ada perubahan arsitektur atau keputusan teknis baru._

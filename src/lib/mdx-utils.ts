@@ -1,6 +1,6 @@
-import fs from "fs/promises";
-import path from "path";
 import matter from "gray-matter";
+import { getDocsStorage } from "@/lib/docs-storage";
+import { isFolderKeepKey } from "@/lib/docs-storage/keys";
 
 export interface MDXFile {
   slug: string[];
@@ -25,8 +25,6 @@ export interface SearchableContent {
   structuredData: any;
 }
 
-const DOCS_DIR = path.join(process.cwd(), "content", "docs");
-
 /**
  * Sanitize path/slug components for URL-safe usage
  */
@@ -34,83 +32,86 @@ function sanitizeSlugComponent(component: string): string {
   return component
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9\-_]/g, "-") // Replace invalid characters with dash
-    .replace(/-+/g, "-") // Replace multiple dashes with single dash
-    .replace(/^-|-$/g, ""); // Remove leading/trailing dashes
+    .replace(/[^a-z0-9\-_]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function slugFromRelKey(relKey: string): string[] {
+  const withoutExt = relKey.replace(/\.mdx$/i, "");
+  const segments = withoutExt.split("/").filter(Boolean);
+  const slug = segments
+    .map(sanitizeSlugComponent)
+    .filter(Boolean);
+  if (slug[slug.length - 1] === "index") {
+    slug.pop();
+  }
+  return slug;
+}
+
+function urlFromSlug(slug: string[]): string {
+  return `/docs/${slug.join("/")}`;
 }
 
 /**
- * Parse a single MDX file and extract frontmatter and content
+ * Parse MDX from a storage-relative key (posix, under content/docs).
  */
-export async function parseMDXFile(filePath: string): Promise<MDXFile | null> {
+export async function parseMDXRelKey(relKey: string): Promise<MDXFile | null> {
   try {
-    const fileContent = await fs.readFile(filePath, "utf-8");
-    const { data, content } = matter(fileContent);
-
-    // Get file stats for lastModified
-    const stats = await fs.stat(filePath);
-
-    // Generate slug from file path with sanitization
-    const relativePath = path.relative(DOCS_DIR, filePath);
-    const slug = relativePath
-      .replace(/\.mdx$/, "")
-      .split(path.sep)
-      .filter(Boolean)
-      .map(sanitizeSlugComponent) // Sanitize each path component
-      .filter(Boolean); // Remove empty components after sanitization
-
-    // Remove "index" from slug if it's the last part
-    if (slug[slug.length - 1] === "index") {
-      slug.pop();
+    if (!relKey.endsWith(".mdx") || isFolderKeepKey(relKey)) {
+      return null;
     }
+    const storage = getDocsStorage();
+    const fileContent = await storage.getText(relKey);
+    if (fileContent === null) {
+      return null;
+    }
+    const { data, content } = matter(fileContent);
+    const head = await storage.head(relKey);
+    const lastModified = head?.lastModified ?? new Date();
 
-    const url = `/docs/${slug.join("/")}`;
+    const slug = slugFromRelKey(relKey);
 
     return {
       slug,
-      filePath: relativePath,
-      url,
+      filePath: relKey,
+      url: urlFromSlug(slug),
       data: {
         title: data.title || "Untitled",
         description: data.description || "",
         ...data,
       },
       content,
-      lastModified: stats.mtime,
+      lastModified,
     };
   } catch (error) {
-    console.error(`Error parsing MDX file ${filePath}:`, error);
+    console.error(`Error parsing MDX rel key ${relKey}:`, error);
     return null;
   }
 }
 
+/** @deprecated Use parseMDXRelKey — accepts absolute path only for legacy callers (local fs). */
+export async function parseMDXFile(filePath: string): Promise<MDXFile | null> {
+  const normalized = filePath.replace(/\\/g, "/");
+  const marker = "/content/docs/";
+  const idx = normalized.indexOf(marker);
+  const rel =
+    idx >= 0
+      ? normalized.slice(idx + marker.length)
+      : normalized.split("content/docs/").pop() ?? normalized;
+  if (!rel) return null;
+  return parseMDXRelKey(rel);
+}
+
 /**
- * Recursively scan directory for MDX files
+ * Recursively scan for MDX keys via configured storage
  */
-export async function scanMDXFiles(
-  directory: string = DOCS_DIR
-): Promise<string[]> {
-  try {
-    const files: string[] = [];
-    const entries = await fs.readdir(directory, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = path.join(directory, entry.name);
-
-      if (entry.isDirectory()) {
-        // Recursively scan subdirectories
-        const subFiles = await scanMDXFiles(fullPath);
-        files.push(...subFiles);
-      } else if (entry.isFile() && entry.name.endsWith(".mdx")) {
-        files.push(fullPath);
-      }
-    }
-
-    return files;
-  } catch (error) {
-    console.error(`Error scanning directory ${directory}:`, error);
-    return [];
-  }
+export async function scanMDXRelKeys(): Promise<string[]> {
+  const storage = getDocsStorage();
+  const keys = await storage.listAllKeys();
+  return keys.filter(
+    (k) => k.endsWith(".mdx") && !isFolderKeepKey(k),
+  );
 }
 
 /**
@@ -118,11 +119,10 @@ export async function scanMDXFiles(
  */
 export async function getAllMDXFiles(): Promise<MDXFile[]> {
   try {
-    const filePaths = await scanMDXFiles();
-    const promises = filePaths.map(parseMDXFile);
-    const results = await Promise.all(promises);
-
-    // Filter out null results and return only valid MDX files
+    const relKeys = await scanMDXRelKeys();
+    const results = await Promise.all(
+      relKeys.map((k) => parseMDXRelKey(k)),
+    );
     return results.filter((file): file is MDXFile => file !== null);
   } catch (error) {
     console.error("Error getting all MDX files:", error);
@@ -151,7 +151,7 @@ export async function getLatestMDXFiles(limit: number = 4): Promise<MDXFile[]> {
         slug: f.slug,
         url: f.url,
         lastModified: f.lastModified.toISOString(),
-      }))
+      })),
     );
 
     return sortedFiles;
@@ -163,9 +163,6 @@ export async function getLatestMDXFiles(limit: number = 4): Promise<MDXFile[]> {
 
 const PLAIN_PREVIEW_MAX = 200;
 
-/**
- * Strip MDX / markdown noise for search excerpts (best-effort).
- */
 export function plainTextFromMdx(raw: string): string {
   return raw
     .replace(/```[\s\S]*?```/g, " ")
@@ -179,13 +176,10 @@ export function plainTextFromMdx(raw: string): string {
     .trim();
 }
 
-/**
- * Short excerpt around the first query hit in plain text, or leading text when no hit / empty query.
- */
 export function excerptAroundQuery(
   rawMdx: string,
   query: string,
-  radius = 85
+  radius = 85,
 ): string {
   const plain = plainTextFromMdx(rawMdx);
   const q = query.trim().toLowerCase();
@@ -213,13 +207,10 @@ export function excerptAroundQuery(
   return slice;
 }
 
-/**
- * Subtitle for search UI: prefer description when it matches query; else body excerpt around query.
- */
 export function pickSearchExcerpt(
   query: string,
   description: string,
-  rawMdx: string
+  rawMdx: string,
 ): string {
   const desc = description.trim();
   const q = query.trim().toLowerCase();
@@ -241,11 +232,8 @@ export function pickSearchExcerpt(
   return excerptAroundQuery(rawMdx, query);
 }
 
-/**
- * Search in MDX files content
- */
 export async function searchMDXFiles(
-  query: string
+  query: string,
 ): Promise<SearchableContent[]> {
   try {
     const allFiles = await getAllMDXFiles();
@@ -262,7 +250,6 @@ export async function searchMDXFiles(
         structuredData: extractStructuredData(file.content),
       };
 
-      // Simple search implementation - can be improved with better matching algorithm
       const searchText = query.toLowerCase();
       const titleMatch = file.data.title.toLowerCase().includes(searchText);
       const descriptionMatch = file.data.description
@@ -282,12 +269,8 @@ export async function searchMDXFiles(
   }
 }
 
-/**
- * Extract structured data from MDX content for search indexing
- */
 function extractStructuredData(content: string): any {
   try {
-    // Extract headings for structured data
     const headings: { id: string; text: string; level: number }[] = [];
     const headingRegex = /^(#{1,6})\s+(.+)$/gm;
     let match;
@@ -305,7 +288,7 @@ function extractStructuredData(content: string): any {
 
     return {
       headings,
-      sections: headings.filter((h) => h.level <= 3), // Only include major headings
+      sections: headings.filter((h) => h.level <= 3),
     };
   } catch (error) {
     console.error("Error extracting structured data:", error);
@@ -314,25 +297,22 @@ function extractStructuredData(content: string): any {
 }
 
 /**
- * Get a specific MDX file by slug
+ * Get a specific MDX file by slug (URL segments)
  */
 export async function getMDXFileBySlug(
-  slug: string[]
+  slug: string[],
 ): Promise<MDXFile | null> {
   try {
-    // Try different possible file paths
-    const possiblePaths = [
-      path.join(DOCS_DIR, ...slug) + ".mdx",
-      path.join(DOCS_DIR, ...slug, "index.mdx"),
-    ];
+    const storage = getDocsStorage();
+    const base = slug.filter(Boolean).join("/");
+    const candidates = base
+      ? [`${base}.mdx`, `${base}/index.mdx`]
+      : [`index.mdx`];
 
-    for (const filePath of possiblePaths) {
-      try {
-        await fs.access(filePath);
-        return await parseMDXFile(filePath);
-      } catch {
-        // Try next path
-        continue;
+    for (const relKey of candidates) {
+      if (await storage.exists(relKey)) {
+        const parsed = await parseMDXRelKey(relKey);
+        if (parsed) return parsed;
       }
     }
 
@@ -343,9 +323,6 @@ export async function getMDXFileBySlug(
   }
 }
 
-/**
- * Check if MDX file exists
- */
 export async function mdxFileExists(slug: string[]): Promise<boolean> {
   const file = await getMDXFileBySlug(slug);
   return file !== null;
