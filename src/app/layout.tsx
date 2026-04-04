@@ -5,6 +5,9 @@ import { AuthProvider } from "@/app/(auth)/login/_components/provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ToastProvider } from "@/components/ui/use-toast";
 import SearchDialog from "./_components/search";
+import { rootMetadata } from "./root-metadata";
+
+export const metadata = rootMetadata;
 
 export default function BaseLayout({ children }: { children: ReactNode }) {
   return (

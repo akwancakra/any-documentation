@@ -10,7 +10,7 @@ import { SiteLogo } from "@/components/shell/site-logo";
  */
 export const baseOptions: BaseLayoutProps = {
   nav: {
-    title: <SiteLogo asLink={false} className="text-base" />,
+    title: <SiteLogo asLink={false} className="text-base" size="sm" />,
   },
   // see https://fumadocs.dev/docs/ui/navigation/links
   links: [],

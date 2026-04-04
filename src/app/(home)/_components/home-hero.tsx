@@ -1,22 +1,24 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Search } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { useSearchContext } from "fumadocs-ui/provider";
 import { Button } from "@/components/ui/button";
-import { HeroGridBackdrop } from "@/components/shell/hero-grid-backdrop";
-import { SiteLogo } from "@/components/shell/site-logo";
-import { ThemeSwitcher } from "./theme-switcher";
-import { isAdmin as checkIsAdmin } from "@/lib/auth-utils";
+import { Navbar } from "./navbar";
+
+function isEditableTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  return el.isContentEditable || !!el.closest("[contenteditable='true']");
+}
 
 export function HomeHero() {
   const reduceMotion = useReducedMotion();
   const { setOpenSearch, enabled: searchEnabled } = useSearchContext();
-  const { data: session, status } = useSession();
-  const isAdmin = session && checkIsAdmin(session);
-  const userName = session?.user?.name || session?.user?.email || "";
+  const [searchKeyHint, setSearchKeyHint] = useState<string | null>(null);
 
   const fadeUp = (delay = 0) => ({
     initial: reduceMotion ? undefined : { opacity: 0, y: 20 },
@@ -30,6 +32,24 @@ export function HomeHero() {
     transition: reduceMotion ? { duration: 0 } : { duration: 0.6, delay },
   });
 
+  useEffect(() => {
+    setSearchKeyHint(
+      /Mac|iPhone|iPod|iPad/i.test(navigator.userAgent) ? "⌘K" : "Ctrl+K",
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!searchEnabled) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "k") return;
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      setOpenSearch(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [searchEnabled, setOpenSearch]);
+
   return (
     <section className="relative overflow-hidden bg-background pb-8 md:pb-12">
       <div
@@ -42,52 +62,9 @@ export function HomeHero() {
         aria-hidden
       />
 
-      <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-5 max-w-7xl mx-auto gap-4">
-        <div className="flex items-center gap-6 md:gap-8 min-w-0">
-          <Link
-            href="/"
-            className="text-foreground font-bold text-xl tracking-tight flex items-center gap-2 shrink-0"
-          >
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-foreground text-background font-black text-sm">
-              W
-            </span>
-            <span className="truncate">Wiki Docs</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
-            <Link
-              href="/docs"
-              className="hover:text-foreground transition-colors"
-            >
-              Docs
-            </Link>
-            {isAdmin ? (
-              <Link
-                href="/dashboard"
-                className="hover:text-foreground transition-colors"
-              >
-                Dashboard
-              </Link>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 md:gap-3 shrink-0">
-          <ThemeSwitcher />
-          {status === "authenticated" ? (
-            <>
-              <span className="text-xs text-muted-foreground max-w-[100px] truncate hidden lg:inline">
-                {userName}
-              </span>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/api/auth/signout">Logout</Link>
-              </Button>
-            </>
-          ) : (
-            <Button asChild size="sm">
-              <Link href="/login">Login</Link>
-            </Button>
-          )}
-        </div>
-      </nav>
+      <div className="relative z-10">
+        <Navbar />
+      </div>
 
       <div className="relative z-10 flex flex-col items-center pt-8 text-center md:pt-14 ds-page-shell">
         <motion.div {...fadeUp(0)}>
@@ -125,10 +102,16 @@ export function HomeHero() {
             variant="pillOutline"
             className="gap-2"
             disabled={!searchEnabled}
+            aria-keyshortcuts="Control+K Meta+K"
             onClick={() => setOpenSearch(true)}
           >
             <Search className="h-4 w-4" aria-hidden />
             Search docs
+            {searchKeyHint ? (
+              <kbd className="ml-2 hidden sm:inline-flex items-center rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground tabular-nums">
+                {searchKeyHint}
+              </kbd>
+            ) : null}
           </Button>
         </motion.div>
       </div>

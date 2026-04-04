@@ -13,7 +13,9 @@ export default async function Layout({ children }: { children: ReactNode }) {
     <DocsLayout
       tree={tree}
       nav={{
-        title: <SiteLogo asLink={false} className="text-base" />,
+        title: (
+          <SiteLogo asLink={false} className="text-base" size="sm" />
+        ),
       }}
     >
       {children}

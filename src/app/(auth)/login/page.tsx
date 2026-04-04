@@ -208,7 +208,7 @@ function LoginForm() {
 
         <div className="text-center mt-6">
           <p className="text-sm text-muted-foreground">
-            Belum punya akun? Hubungi administrator wiki untuk dibuatkan user.
+            Belum punya akun? Hubungi administrator untuk pembuatan akun.
           </p>
         </div>
       </div>

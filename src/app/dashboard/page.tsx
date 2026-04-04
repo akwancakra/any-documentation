@@ -16,6 +16,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useEffect, useState, Suspense } from "react";
 import { isAdmin as checkIsAdmin } from "@/lib/auth-utils";
 import type { ActivityLogEntry } from "@/lib/activity-log-store";
+import { formatActivityLogTime } from "@/lib/formatters";
 import {
   Shield,
   FileText,
@@ -128,8 +129,8 @@ function DashboardContent() {
       .then((res) => res.json())
       .then((data) =>
         setRecentActivity(
-          Array.isArray(data.logs) ? (data.logs as ActivityLogEntry[]) : []
-        )
+          Array.isArray(data.logs) ? (data.logs as ActivityLogEntry[]) : [],
+        ),
       )
       .catch((err) => {
         if (err.name === "AbortError") return;
@@ -176,13 +177,12 @@ function DashboardContent() {
 
   const quickActions = [
     {
-      title: "Security Documentation",
-      description: "Security guidelines and best practices",
-      icon: Shield,
+      title: "All Documentation",
+      description: "All documentation in the system",
+      icon: FileText,
       href: "/docs",
       available: true,
     },
-    // FAQ Database removed — faq.mdx not present
     {
       title: "Documentation Editor",
       description: "Create and edit documentation",
@@ -191,7 +191,6 @@ function DashboardContent() {
       available: isAdmin,
       adminOnly: true,
     },
-    // User Management / System Settings removed — no routes
     {
       title: "Login Logs",
       description: "Monitor user login activities",
@@ -341,9 +340,12 @@ function DashboardContent() {
                     className="flex flex-wrap items-center gap-2 text-sm sm:flex-nowrap"
                   >
                     <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                      {new Date(log.time).toLocaleString("en-US")}
+                      {formatActivityLogTime(log.time)}
                     </span>
-                    <Badge variant="secondary" className="shrink-0 text-xs font-medium">
+                    <Badge
+                      variant="secondary"
+                      className="shrink-0 text-xs font-medium"
+                    >
                       {activityBadgeLabel(log.type)}
                     </Badge>
                     <span className="min-w-0 flex-1 truncate text-foreground">

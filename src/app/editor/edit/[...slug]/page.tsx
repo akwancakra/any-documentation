@@ -7,9 +7,10 @@ import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { authOptions } from "@/lib/auth-options";
+import { getAiEnhanceAvailability } from "@/lib/ai-enhance-env";
 
 export const metadata = {
-  title: "Edit | Wiki Docs",
+  title: "Edit | Any Documentation",
   description: "Edit a documentation page.",
 };
 
@@ -94,8 +95,13 @@ export default async function EditPage({
       filePath: fileData.filePath,
     };
 
-    // Render split-view editor with data from API
-    return <SplitViewEditorWithToast editMode={editModeData} />;
+    const initialAiAvailability = getAiEnhanceAvailability();
+    return (
+      <SplitViewEditorWithToast
+        editMode={editModeData}
+        initialAiAvailability={initialAiAvailability}
+      />
+    );
   } catch (error) {
     console.error("Error loading page for editing:", error);
     notFound();

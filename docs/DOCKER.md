@@ -1,6 +1,6 @@
-# Panduan Docker untuk CYS Wiki
+# Panduan Docker untuk Any Documentation
 
-Dokumen ini berisi petunjuk lengkap untuk menjalankan aplikasi CYS Wiki menggunakan Docker.
+Dokumen ini berisi petunjuk lengkap untuk menjalankan aplikasi Any Documentation menggunakan Docker.
 
 ## Prerequisites
 

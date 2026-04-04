@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { Navbar } from "../(home)/_components/navbar";
 
 export const metadata = {
-  title: "Dashboard | Wiki Docs",
-  description: "Wiki documentation admin panel.",
+  title: "Dashboard | Any Documentation",
+  description: "Any Documentation admin panel.",
 };
 
 export default function Layout({ children }: { children: ReactNode }) {

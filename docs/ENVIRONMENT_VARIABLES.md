@@ -1,6 +1,6 @@
 # Environment Variables
 
-Ringkasan variabel yang dipakai aplikasi wiki (autentikasi database lokal).
+Ringkasan variabel yang dipakai aplikasi Any Documentation (autentikasi database lokal).
 
 ## Wajib
 

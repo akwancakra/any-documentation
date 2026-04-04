@@ -18,7 +18,10 @@ export function Navbar() {
         <div className="flex min-w-0 items-center gap-6 md:gap-8">
           <SiteLogo />
           <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-            <Link href="/docs" className="transition-colors hover:text-foreground">
+            <Link
+              href="/docs"
+              className="transition-colors hover:text-foreground"
+            >
               Docs
             </Link>
             {isAdmin ? (

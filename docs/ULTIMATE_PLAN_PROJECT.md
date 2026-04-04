@@ -27,7 +27,7 @@
 
 ## 1. Project Overview
 
-**any-documentation** adalah platform wiki/dokumentasi berbasis MDX dengan editor WYSIWYG, autentikasi admin, dan fitur AI (Gemini) untuk generate & improve konten. Project ini dirancang sebagai **production-grade portfolio** yang membuktikan kemampuan Cloud Engineering, DevOps, dan Quality Assurance secara end-to-end.
+**any-documentation** (Any Documentation) adalah platform dokumentasi berbasis MDX dengan editor WYSIWYG, autentikasi admin, dan fitur AI (Gemini) untuk generate & improve konten. Project ini dirancang sebagai **production-grade portfolio** yang membuktikan kemampuan Cloud Engineering, DevOps, dan Quality Assurance secara end-to-end.
 
 ### Goals
 
@@ -1053,7 +1053,7 @@ terraform force-unlock <LOCK_ID>
 
 **Keputusan**: `force-dynamic` + baca dari storage per-request  
 **Alasan**: Konten MDX bisa berubah lewat editor setelah image di-build; SSG tidak cocok.  
-**Tradeoff diterima**: Setiap request ke `/docs` memerlukan S3 `GetObject` / `ListObjectsV2`; untuk wiki kecil ini acceptable. `React.cache` meminimalkan duplikasi per-request.
+**Tradeoff diterima**: Setiap request ke `/docs` memerlukan S3 `GetObject` / `ListObjectsV2`; untuk situs dokumentasi kecil ini acceptable. `React.cache` meminimalkan duplikasi per-request.
 
 ### ADR-006: Terraform vs CDK
 

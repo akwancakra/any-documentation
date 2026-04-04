@@ -1,6 +1,6 @@
 # Security Audit & Bug Analysis Report
 
-**Project:** CyberSec Docs (cys-fumadocs)  
+**Project:** Any Documentation (any-documentation)  
 **Tanggal Audit:** 28 Maret 2026  
 **Framework:** Next.js 15.3.3 (App Router), React 19, NextAuth v4, Fumadocs  
 **Severity Scale:** 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low | ⚪ Info
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
 
 **Dampak:**
 - Penyerang bisa membuat atau menimpa file dokumentasi tanpa login
-- Potensi defacement konten wiki
+- Potensi defacement konten dokumentasi
 - Komentar di baris 102 mengakui masalah: `user: "unknown", // Belum ada auth di API`
 
 **Rekomendasi:**

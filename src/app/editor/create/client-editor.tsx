@@ -1,5 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
+import type { AiEnhanceAvailability } from "@/lib/ai-enhance-env";
 
 const SplitViewEditorWithToast = dynamic(
   () => import("@/app/editor/_components/split-view-editor"),
@@ -10,9 +11,19 @@ const EditorWithToast = dynamic(
   { ssr: false }
 );
 
-export default function CreateEditorClient({ type }: { type?: string }) {
+export default function CreateEditorClient({
+  type,
+  initialAiAvailability,
+}: {
+  type?: string;
+  initialAiAvailability: AiEnhanceAvailability;
+}) {
   if (type === "live") {
     return <EditorWithToast />;
   }
-  return <SplitViewEditorWithToast />;
+  return (
+    <SplitViewEditorWithToast
+      initialAiAvailability={initialAiAvailability}
+    />
+  );
 }

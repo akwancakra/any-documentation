@@ -1,36 +1,36 @@
-# CYS Wiki — Documentation Platform
+# Any Documentation — Documentation Platform
 
-Platform dokumentasi berbasis MDX dengan autentikasi lokal (PostgreSQL + NextAuth Credentials), bcrypt, dan RBAC (admin / user).
+MDX-based documentation platform with local authentication (PostgreSQL + NextAuth Credentials), bcrypt, and RBAC (admin / user).
 
 ## ✨ Features
 
 ### Authentication
 
-- **PostgreSQL + Prisma**: User disimpan di database; password di-hash dengan bcrypt
-- **Role-based access**: Admin (editor, upload, dashboard) vs user (baca docs)
-- **Login logging**: API internal untuk audit login (opsional)
+- **PostgreSQL + Prisma**: Users stored in the database; passwords hashed with bcrypt
+- **Role-based access**: Admin (editor, upload, dashboard) vs user (read docs)
+- **Login logging**: Internal API for login audit (optional)
 
 ### 📊 Admin Dashboard
 
-- **Login Logs Monitoring**: Real-time tracking aktivitas login users
+- **Login Logs Monitoring**: Real-time tracking of user login activity
 - **User Analytics**: Statistics, success rate, device info, browser analytics
-- **Advanced Filtering**: Filter berdasarkan status, provider, tanggal, dll
+- **Advanced Filtering**: Filter by status, provider, date, and more
 - **Responsive Design**: Mobile-friendly admin interface
 
 ### 📚 Documentation Platform
 
-- **MDX Support**: Rich markdown dengan React components
+- **MDX Support**: Rich markdown with React components
 - **Search Functionality**: Full-text search across documentation
-- **Modern UI**: Clean, responsive interface dengan dark/light mode
-- **Content Management**: Editor untuk admin users
+- **Modern UI**: Clean, responsive interface with dark/light mode
+- **Content Management**: Editor for admin users
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- PostgreSQL 14+ (lokal atau Docker)
-- `npm` atau `yarn`
+- PostgreSQL 14+ (local or Docker)
+- `npm` or `yarn`
 
 ### Setup
 
@@ -40,16 +40,16 @@ cd any-documentation
 cp env.template .env.local
 # Edit .env.local: DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL
 
-# Jalankan Postgres (opsional Docker):
+# Run Postgres (optional Docker):
 # docker compose --profile with-postgres up -d
 
 npm install
-npm run db:migrate   # atau: npm run db:push
-npm run db:seed      # buat admin pertama (lihat SEED_* di .env)
+npm run db:migrate   # or: npm run db:push
+npm run db:seed      # create first admin (see SEED_* in .env)
 npm run dev
 ```
 
-### Environment (ringkas)
+### Environment (summary)
 
 ```env
 DATABASE_URL=postgresql://USER:PASS@localhost:5432/wiki?schema=public
@@ -101,23 +101,23 @@ any-documentation/
 
 ## Authentication flow
 
-1. User mengirim email + password ke NextAuth Credentials.
-2. Server mencari user di PostgreSQL (email unik, case-insensitive).
-3. Password diverifikasi dengan `bcrypt.compare`.
-4. Role diambil dari kolom `users.role` (`admin` / `user`).
-5. JWT session berisi `role` dan `id` user; login log opsional ke `/api/login-log`.
+1. User submits email + password to NextAuth Credentials.
+2. Server looks up the user in PostgreSQL (unique email, case-insensitive).
+3. Password is verified with `bcrypt.compare`.
+4. Role is read from `users.role` (`admin` / `user`).
+5. JWT session includes `role` and user `id`; optional login log to `/api/login-log`.
 
 ## 📊 Login Logging System
 
 ### Automatic Data Collection
 
-- ✅ **IP Address**: Client IP dengan proxy support
-- ✅ **Device Detection**: Desktop/Mobile/Tablet identification
+- ✅ **IP Address**: Client IP with proxy support
+- ✅ **Device Detection**: Desktop / mobile / tablet identification
 - ✅ **Browser Info**: Chrome, Firefox, Safari, Edge detection
 - ✅ **Operating System**: Windows, macOS, Linux, iOS, Android
-- ✅ **User Agent**: Complete browser string untuk forensic
-- ✅ **Timestamp**: Precise login time dengan timezone
-- ✅ **Success/Failure**: Status tracking untuk security monitoring
+- ✅ **User Agent**: Full browser string for forensics
+- ✅ **Timestamp**: Precise login time with timezone
+- ✅ **Success / Failure**: Status tracking for security monitoring
 
 ### Admin Dashboard Features
 
@@ -125,21 +125,21 @@ any-documentation/
 - **Advanced Filtering**: Status, provider, date range filters
 - **Device Analytics**: Top browsers, OS, device types
 - **Pagination**: Handle large datasets efficiently
-- **Export Ready**: Data structure ready untuk CSV/JSON export
+- **Export Ready**: Data structure ready for CSV / JSON export
 
 ## 🛡️ Security Features
 
 ### Authentication Security
 
-- **API Token Protection**: Secure storage environment variables
-- **Session Management**: JWT dengan NextAuth encryption
+- **API Token Protection**: Secure storage in environment variables
+- **Session Management**: JWT with NextAuth encryption
 - **Role-based Permissions**: Granular access control
-- **Failed Login Tracking**: Monitor brute force attempts
+- **Failed Login Tracking**: Monitor brute-force attempts
 
 ### Data Privacy
 
-- **No Password Storage**: Passwords never stored atau logged
-- **IP Anonymization**: Ready untuk GDPR compliance
+- **Secure Password Handling**: Only bcrypt hashes are stored; plaintext passwords are never logged
+- **IP Anonymization**: Ready for GDPR-style compliance
 - **Data Retention**: Configurable log cleanup
 - **Audit Trail**: Complete activity monitoring
 
@@ -170,7 +170,7 @@ This project provides two types of documentation editors for admin users:
 - **Description:** A WYSIWYG (What You See Is What You Get) editor with real-time preview. Suitable for users who prefer editing content visually.
 - **How to use:**
   - When creating a new doc, select **Live Preview** in the editor selection dialog.
-  - The editor will show a live preview as you write.
+  - The editor shows a live preview as you write.
 
 ### 2. Split View (Code) Editor
 
@@ -183,9 +183,9 @@ This project provides two types of documentation editors for admin users:
 
 ### Selecting Editor Type
 
-- When you click **Create Doc** (admin only), an **Editor Type Dialog** will appear.
+- When you click **Create Doc** (admin only), an **Editor Type Dialog** appears.
 - Choose between **Live Preview** and **Split View (Code)**.
-- The selected editor will be used for the new document.
+- The selected editor is used for the new document.
 - You can only choose the editor type when creating a new doc. Editing always uses the split view editor.
 
 ## 🧩 Available MDX Components (Split View Editor)
@@ -203,7 +203,7 @@ When using the split view editor, you can use the following MDX components in yo
 - `VideoViewer`: Embed videos
 - `img`: Enhanced image support (auto-zoom, responsive)
 - `table`, `thead`, `th`, `td`: Styled tables
-- Headings (`h1`-`h6`): Auto-generated anchor links
+- Headings (`h1`–`h6`): Auto-generated anchor links
 - `pre`: Auto-highlighted code blocks
 
 You can also use all standard Markdown/MDX elements. For details, see `src/mdx-components.tsx`.
@@ -215,14 +215,14 @@ You can also use all standard Markdown/MDX elements. For details, see `src/mdx-c
 ```bash
 # 1. Test login (database)
 # Visit: http://localhost:3000/login
-# Gunakan email/password dari seed (atau user yang sudah dibuat di DB)
+# Use email/password from seed (or a user created in the DB)
 
 # 2. Test admin access
-# Login sebagai user dengan role admin
+# Log in as a user with admin role
 # Visit: http://localhost:3000/dashboard/login-logs
 
-# 3. Test role
-# Ubah users.role di DB / Prisma Studio; verifikasi akses /editor dan dashboard
+# 3. Test roles
+# Change users.role in the DB / Prisma Studio; verify /editor and dashboard access
 ```
 
 ### Environment Testing
@@ -272,28 +272,28 @@ NODE_ENV=production
 
 ## 🤝 Support
 
-### Masalah teknis
+### Technical issues
 
-- Cek console browser (F12) dan log server
-- Pastikan `DATABASE_URL`, migrasi, dan `NEXTAUTH_*` benar di environment production
+- Check the browser console (F12) and server logs
+- Ensure `DATABASE_URL`, migrations, and `NEXTAUTH_*` are correct in the production environment
 
 ## 🔮 Roadmap
 
 ### Phase 1 (Current) ✅
 
-- ✅ Autentikasi PostgreSQL + NextAuth Credentials
+- ✅ PostgreSQL + NextAuth Credentials authentication
 - ✅ Login logging system
 - ✅ Admin dashboard
 - ✅ Role-based access control
 
 ### Phase 2 (Planned)
 
-- [ ] Database integration untuk persistent logging
+- [ ] Database integration for persistent logging
 - [ ] Real-time notifications
-- [ ] Advanced analytics dengan charts
+- [ ] Advanced analytics with charts
 - [ ] Export functionality (CSV/Excel)
 - [ ] Geolocation tracking
-- [ ] Rate limiting & brute force protection
+- [ ] Rate limiting & brute-force protection
 
 ### Phase 3 (Future)
 
@@ -315,38 +315,38 @@ NODE_ENV=production
 
 ---
 
-## 📄 Contoh Penggunaan Komponen Fumadocs (MDX)
+## 📄 Fumadocs component usage example (MDX)
 
 ```mdx
-# Contoh Penggunaan Komponen Fumadocs
+# Fumadocs component examples
 
-<Banner>Ini adalah banner penting!</Banner>
+<Banner>This is an important banner!</Banner>
 
-<Accordion title="Apa itu Fumadocs?">
-  Fumadocs adalah framework dokumentasi modern berbasis MDX.
+<Accordion title="What is Fumadocs?">
+  Fumadocs is a modern MDX-based documentation framework.
 </Accordion>
 
 <Accordions>
-  <Accordion title="Fitur 1">Deskripsi fitur 1</Accordion>
-  <Accordion title="Fitur 2">Deskripsi fitur 2</Accordion>
+  <Accordion title="Feature 1">Feature 1 description</Accordion>
+  <Accordion title="Feature 2">Feature 2 description</Accordion>
 </Accordions>
 
 <DynamicCodeBlock lang="js" code={`console.log('Hello Fumadocs!')`} />
 
 <ImageZoom
   src="/docs/images/screenshot-2025-06-28-192107-38759540.png"
-  alt="Contoh Screenshot"
+  alt="Example screenshot"
   width={600}
   height={400}
 />
 
 <InlineTOC />
 
-<Step title="Langkah 1">Install dependencies</Step>
-<Step title="Langkah 2">Jalankan server</Step>
+<Step title="Step 1">Install dependencies</Step>
+<Step title="Step 2">Run the server</Step>
 <Steps>
-  <Step title="A">Aksi A</Step>
-  <Step title="B">Aksi B</Step>
+  <Step title="A">Action A</Step>
+  <Step title="B">Action B</Step>
 </Steps>
 
 <Tabs defaultValue="tab1">
@@ -354,8 +354,8 @@ NODE_ENV=production
     <TabsTrigger value="tab1">Tab 1</TabsTrigger>
     <TabsTrigger value="tab2">Tab 2</TabsTrigger>
   </TabsList>
-  <TabsContent value="tab1">Konten Tab 1</TabsContent>
-  <TabsContent value="tab2">Konten Tab 2</TabsContent>
+  <TabsContent value="tab1">Tab 1 content</TabsContent>
+  <TabsContent value="tab2">Tab 2 content</TabsContent>
 </Tabs>
 
 <PDFViewer src="/docs/files/example.pdf" width={800} height={600} />
@@ -365,7 +365,7 @@ NODE_ENV=production
 
 ---
 
-## 📦 Contoh Integrasi Komponen MDX di Next.js (Server Component)
+## 📦 MDX component integration example in Next.js (Server Component)
 
 ```tsx
 // app/docs/[[...slug]]/page.tsx
@@ -378,7 +378,7 @@ return (
   <MdxContent
     code={page?.data.body}
     components={getMDXComponents({
-      // Contoh: custom link handler
+      // Example: custom link handler
       a: (props) => <a {...props} target="_blank" rel="noopener" />,
     })}
   />

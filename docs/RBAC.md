@@ -1,6 +1,6 @@
 # Role-Based Access Control (RBAC)
 
-Dokumentasi sistem kontrol akses berdasarkan role dalam aplikasi CyberSec Docs.
+Dokumentasi sistem kontrol akses berdasarkan role dalam aplikasi Any Documentation.
 
 ## Roles yang Tersedia
 

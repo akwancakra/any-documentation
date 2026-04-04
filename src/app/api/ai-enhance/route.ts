@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import { getAiEnhanceAvailability } from "@/lib/ai-enhance-env";
 
 type ProviderId = "openai" | "gemini" | "ollama";
 
@@ -27,22 +28,25 @@ function parseOrderFromEnv(): ProviderId[] {
 }
 
 function initializeProviders() {
+  const envAvail = getAiEnhanceAvailability();
   return {
     openai: {
       id: "openai" as const,
-      available: Boolean(process.env.OPENAI_API_KEY),
+      available: envAvail.openai,
       apiKey: process.env.OPENAI_API_KEY ?? "",
       model: process.env.OPENAI_AI_MODEL || "gpt-4o-mini",
     },
     gemini: {
       id: "gemini" as const,
-      available: Boolean(process.env.GEMINI_API_KEY),
+      available: envAvail.gemini,
       model: process.env.GEMINI_AI_MODEL || "gemini-2.0-flash-exp",
-      client: process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null,
+      client: process.env.GEMINI_API_KEY
+        ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+        : null,
     },
     ollama: {
       id: "ollama" as const,
-      available: Boolean(process.env.OLLAMA_API_KEY),
+      available: envAvail.ollama,
       endpoint: process.env.OLLAMA_API_ENDPOINT || "http://localhost:11434",
       model: process.env.OLLAMA_AI_MODEL || "llama3.2",
       apiKey: process.env.OLLAMA_API_KEY,

@@ -2,12 +2,13 @@ import CreateEditorClient from "./client-editor";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { isAdmin as checkIsAdmin } from "@/lib/auth-utils";
+import { getAiEnhanceAvailability } from "@/lib/ai-enhance-env";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Create | Wiki Docs",
+  title: "Create | Any Documentation",
   description: "Create a new documentation page.",
 };
 
@@ -38,5 +39,11 @@ export default async function CreateEditorPage({
     );
   }
   const { type } = await searchParams;
-  return <CreateEditorClient type={type} />;
+  const initialAiAvailability = getAiEnhanceAvailability();
+  return (
+    <CreateEditorClient
+      type={type}
+      initialAiAvailability={initialAiAvailability}
+    />
+  );
 }

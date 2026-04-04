@@ -1,5 +1,7 @@
 // Types for the login log system
 
+import { formatLoginLogTime } from "@/lib/formatters";
+
 export interface LoginLogData {
   event: string;
   success: boolean;
@@ -70,16 +72,7 @@ export interface LoginLogStats {
 }
 
 // Utility functions
-export const formatLoginTime = (timestamp: string): string => {
-  return new Date(timestamp).toLocaleString("en-US", {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-};
+export const formatLoginTime = formatLoginLogTime;
 
 export const getDeviceIcon = (device: string): string => {
   switch (device.toLowerCase()) {

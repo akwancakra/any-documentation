@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { SiteFooter } from "@/app/_components/site-footer";
 
 export const metadata = {
-  title: "Home | Wiki Docs",
-  description: "Documentation wiki — browse, search, and contribute.",
+  title: "Home | Any Documentation",
+  description: "Any Documentation — browse, search, and contribute.",
 };
 
 export default function Layout({ children }: { children: ReactNode }) {

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "Logout | Wiki Docs",
-  description: "Keluar dari wiki dokumentasi.",
+  title: "Logout | Any Documentation",
+  description: "Sign out of Any Documentation.",
 };
 
 export default function Layout({ children }: { children: ReactNode }) {

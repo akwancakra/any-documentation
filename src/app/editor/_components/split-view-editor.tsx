@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  type ReactNode,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -43,6 +49,13 @@ import MDXPreview from "./mdx-preview";
 import { ComponentReference } from "./component-reference";
 import { useRouter } from "next/navigation";
 import { extractFrontmatterMeta } from "@/lib/mdx-frontmatter-meta";
+import type { AiEnhanceAvailability } from "@/lib/ai-enhance-env";
+import { isAiEnhanceConfigured } from "@/lib/ai-enhance-env";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface EditModeData {
   content: string;
@@ -55,9 +68,44 @@ interface EditModeData {
 
 interface SplitViewEditorProps {
   editMode?: EditModeData;
+  /** Dari server (ENV); menyamakan render pertama dengan ketersediaan API */
+  initialAiAvailability?: AiEnhanceAvailability;
 }
 
 type AiProviderPref = "auto" | "openai" | "gemini" | "ollama";
+
+/** Tooltip: elemen disabled tidak menerima hover, jadi trigger membungkus anak. */
+function AiDisabledTooltip({
+  children,
+  message,
+  active,
+  triggerClassName = "inline-flex max-w-full cursor-default",
+}: {
+  children: ReactNode;
+  message: string;
+  /** true = AI aktif, tanpa tooltip */
+  active: boolean;
+  triggerClassName?: string;
+}) {
+  if (active) {
+    return <>{children}</>;
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className={triggerClassName}>{children}</div>
+      </TooltipTrigger>
+      <TooltipContent
+        side="bottom"
+        align="end"
+        sideOffset={6}
+        className="max-w-72 px-3 py-2 text-left text-xs leading-relaxed"
+      >
+        {message}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 type AiAvailability = {
   openai: boolean;
@@ -70,18 +118,21 @@ function AiProviderSelect({
   onChange,
   available,
   triggerClassName,
+  disabled,
 }: {
   value: AiProviderPref;
   onChange: (v: AiProviderPref) => void;
   available: AiAvailability;
   triggerClassName?: string;
+  disabled?: boolean;
 }) {
   return (
     <Select
       value={value}
       onValueChange={(v) => onChange(v as AiProviderPref)}
+      disabled={disabled}
     >
-      <SelectTrigger size="sm" className={triggerClassName}>
+      <SelectTrigger size="sm" className={triggerClassName} disabled={disabled}>
         <SelectValue placeholder="AI provider" />
       </SelectTrigger>
       <SelectContent>
@@ -100,7 +151,10 @@ function AiProviderSelect({
   );
 }
 
-const SplitViewEditor = ({ editMode }: SplitViewEditorProps) => {
+const SplitViewEditor = ({
+  editMode,
+  initialAiAvailability,
+}: SplitViewEditorProps) => {
   const router = useRouter();
   const editorRef = useRef<MDXCodeEditorHandle>(null);
   const [mdxContent, setMdxContent] = useState(
@@ -183,8 +237,18 @@ Enjoy writing with AI! 🚀`
   const [isAiEnhancing, setIsAiEnhancing] = useState(false);
   const [aiProviderPref, setAiProviderPref] =
     useState<AiProviderPref>("auto");
-  const [aiAvailable, setAiAvailable] = useState<AiAvailability>(null);
+  const [aiAvailable, setAiAvailable] = useState<AiAvailability>(() =>
+    initialAiAvailability !== undefined ? initialAiAvailability : null,
+  );
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isAiEnhanceEnabled = useMemo(() => {
+    if (aiAvailable === null) return false;
+    return isAiEnhanceConfigured(aiAvailable);
+  }, [aiAvailable]);
+
+  const aiDisabledHint =
+    "AI nonaktif: set OPENAI_API_KEY, GEMINI_API_KEY, atau OLLAMA_API_KEY di environment.";
 
   useEffect(() => {
     return () => {
@@ -210,6 +274,12 @@ Enjoy writing with AI! 🚀`
         };
         if (!cancelled && data.available) {
           setAiAvailable(data.available);
+        } else if (!cancelled && res.ok) {
+          setAiAvailable({
+            openai: false,
+            gemini: false,
+            ollama: false,
+          });
         }
       } catch {
         /* ignore */
@@ -364,6 +434,7 @@ description: "${metadata.description}"
 
   // AI Enhancement function
   const handleAiEnhancement = async (type: "fix" | "improve" | "format") => {
+    if (!isAiEnhanceEnabled) return;
     setIsAiEnhancing(true);
     try {
       const response = await fetch("/api/ai-enhance", {
@@ -531,56 +602,63 @@ description: "${metadata.description}"
 
           <div className="space-y-2">
             <h3 className="font-semibold text-sm">AI Enhancement</h3>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">AI provider</p>
-              <AiProviderSelect
-                value={aiProviderPref}
-                onChange={setAiProviderPref}
-                available={aiAvailable}
-                triggerClassName="w-full"
-              />
-            </div>
-            <div className="space-y-1.5 mt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  handleAiEnhancement("fix");
-                  setIsMobileMenuOpen(false);
-                }}
-                disabled={isAiEnhancing}
-                className="w-full justify-start"
-              >
-                <Wand2 className="mr-2 h-4 w-4" />
-                Fix Syntax & Format
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  handleAiEnhancement("format");
-                  setIsMobileMenuOpen(false);
-                }}
-                disabled={isAiEnhancing}
-                className="w-full justify-start"
-              >
-                <Wand2 className="mr-2 h-4 w-4" />
-                Tidy Format
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  handleAiEnhancement("improve");
-                  setIsMobileMenuOpen(false);
-                }}
-                disabled={isAiEnhancing}
-                className="w-full justify-start"
-              >
-                <Wand2 className="mr-2 h-4 w-4" />
-                Improve Content
-              </Button>
-            </div>
+            <AiDisabledTooltip
+              active={isAiEnhanceEnabled}
+              message={aiDisabledHint}
+              triggerClassName="block w-full space-y-2"
+            >
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">AI provider</p>
+                <AiProviderSelect
+                  value={aiProviderPref}
+                  onChange={setAiProviderPref}
+                  available={aiAvailable}
+                  triggerClassName="w-full"
+                  disabled={!isAiEnhanceEnabled}
+                />
+              </div>
+              <div className="space-y-1.5 mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    handleAiEnhancement("fix");
+                    setIsMobileMenuOpen(false);
+                  }}
+                  disabled={!isAiEnhanceEnabled || isAiEnhancing}
+                  className="w-full justify-start"
+                >
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Fix Syntax & Format
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    handleAiEnhancement("format");
+                    setIsMobileMenuOpen(false);
+                  }}
+                  disabled={!isAiEnhanceEnabled || isAiEnhancing}
+                  className="w-full justify-start"
+                >
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Tidy Format
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    handleAiEnhancement("improve");
+                    setIsMobileMenuOpen(false);
+                  }}
+                  disabled={!isAiEnhanceEnabled || isAiEnhancing}
+                  className="w-full justify-start"
+                >
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Improve Content
+                </Button>
+              </div>
+            </AiDisabledTooltip>
           </div>
 
           <div className="pt-4 border-t space-y-2">
@@ -643,50 +721,59 @@ description: "${metadata.description}"
             </div>
 
             {/* AI Enhancement */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  disabled={isAiEnhancing}
-                >
-                  {isAiEnhancing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Wand2 className="h-4 w-4" />
-                  )}
+            {isAiEnhanceEnabled ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    disabled={isAiEnhancing}
+                  >
+                    {isAiEnhancing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-4 w-4" />
+                    )}
+                    <span className="hidden lg:inline">AI</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
+                    AI Enhancement
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleAiEnhancement("fix")}
+                    disabled={isAiEnhancing}
+                  >
+                    <Wand2 className="mr-2 h-4 w-4" />
+                    Fix Syntax & Format
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleAiEnhancement("format")}
+                    disabled={isAiEnhancing}
+                  >
+                    <Wand2 className="mr-2 h-4 w-4" />
+                    Tidy Format
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleAiEnhancement("improve")}
+                    disabled={isAiEnhancing}
+                  >
+                    <Wand2 className="mr-2 h-4 w-4" />
+                    Improve Content
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <AiDisabledTooltip active={false} message={aiDisabledHint}>
+                <Button variant="outline" size="sm" className="gap-2" disabled>
+                  <Wand2 className="h-4 w-4" />
                   <span className="hidden lg:inline">AI</span>
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
-                  AI Enhancement
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => handleAiEnhancement("fix")}
-                  disabled={isAiEnhancing}
-                >
-                  <Wand2 className="mr-2 h-4 w-4" />
-                  Fix Syntax & Format
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleAiEnhancement("format")}
-                  disabled={isAiEnhancing}
-                >
-                  <Wand2 className="mr-2 h-4 w-4" />
-                  Tidy Format
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleAiEnhancement("improve")}
-                  disabled={isAiEnhancing}
-                >
-                  <Wand2 className="mr-2 h-4 w-4" />
-                  Improve Content
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </AiDisabledTooltip>
+            )}
 
             {/* Settings Dropdown (desktop) */}
             <div className="hidden md:block">
@@ -753,12 +840,19 @@ description: "${metadata.description}"
                     AI provider
                   </DropdownMenuLabel>
                   <div className="px-2 pb-2">
-                    <AiProviderSelect
-                      value={aiProviderPref}
-                      onChange={setAiProviderPref}
-                      available={aiAvailable}
-                      triggerClassName="w-full h-8"
-                    />
+                    <AiDisabledTooltip
+                      active={isAiEnhanceEnabled}
+                      message={aiDisabledHint}
+                      triggerClassName="block w-full"
+                    >
+                      <AiProviderSelect
+                        value={aiProviderPref}
+                        onChange={setAiProviderPref}
+                        available={aiAvailable}
+                        triggerClassName="w-full h-8"
+                        disabled={!isAiEnhanceEnabled}
+                      />
+                    </AiDisabledTooltip>
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -884,9 +978,9 @@ description: "${metadata.description}"
   );
 };
 
-const SplitViewEditorWithToast = ({ editMode }: SplitViewEditorProps) => (
+const SplitViewEditorWithToast = (props: SplitViewEditorProps) => (
   <ToastProvider>
-    <SplitViewEditor editMode={editMode} />
+    <SplitViewEditor {...props} />
   </ToastProvider>
 );
 

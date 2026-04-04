@@ -1,4 +1,4 @@
-# Production Dockerfile untuk CYS Wiki
+# Production Dockerfile for Any Documentation
 FROM node:20-alpine AS base
 
 # Rebuild the source code only when needed

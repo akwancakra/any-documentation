@@ -1,4 +1,4 @@
-# Quick Setup — Wiki Docs
+# Quick Setup — Any Documentation
 
 ## Prerequisites
 

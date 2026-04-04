@@ -6,6 +6,7 @@ import { getDynamicPage } from "@/lib/dynamic-source";
 import { getMDXComponents } from "@/mdx-components";
 import remarkGfm from "remark-gfm";
 import { EditButton } from "../_components/EditButton";
+import { formatDocLastModified } from "@/lib/formatters";
 
 // Force dynamic rendering - NO STATIC GENERATION!
 export const dynamic = "force-dynamic";
@@ -24,17 +25,7 @@ export default async function Page(props: DocPageParams) {
     notFound();
   }
 
-  // Ambil zona waktu dari env atau fallback Asia/Jakarta
-  const timeZone = process.env.TZ || process.env.TIMEZONE || "Asia/Jakarta";
-  const date = new Date(page.data.lastModified);
-  const lastModifiedFormatted = new Intl.DateTimeFormat("id-ID", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone,
-  }).format(date);
+  const lastModifiedFormatted = formatDocLastModified(page.data.lastModified);
 
   return (
     <DocsPage
@@ -83,8 +74,9 @@ export async function generateMetadata(
     return {};
   }
 
-  const title = page.data.title || "Wiki Docs";
-  const description = page.data.description || "Dokumentasi wiki";
+  const title = page.data.title || "Any Documentation";
+  const description =
+    page.data.description || "Browse product documentation and guides.";
   const baseUrl =
     process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "http://localhost:3000";
   const url = `${baseUrl}/docs/${(params.slug || []).join("/")}`;

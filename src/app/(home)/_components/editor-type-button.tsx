@@ -10,7 +10,7 @@ export function EditorTypeButton() {
     <>
       <Button variant="outline" size="lg" onClick={() => setOpen(true)}>
         <Edit3 className="h-5 w-5 mr-2" />
-        Create Wiki
+        Create documentation
       </Button>
       <EditorTypeDialog open={open} onOpenChange={setOpen} />
     </>

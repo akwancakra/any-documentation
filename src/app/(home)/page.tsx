@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { getLatestMDXFiles } from "@/lib/mdx-utils";
 import { HeroGridBackdrop } from "@/components/shell/hero-grid-backdrop";
 import { HomeHero } from "./_components/home-hero";
+import { formatDateShort } from "@/lib/formatters";
 
 export const dynamic = "force-dynamic";
 
@@ -40,15 +41,6 @@ async function getLatestDocs(): Promise<DocFile[]> {
 
 export default async function HomePage() {
   const latestDocs = await getLatestDocs();
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-US", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }).format(date);
-  };
 
   return (
     <>
@@ -105,7 +97,7 @@ export default async function HomePage() {
                           variant="secondary"
                           className="text-xs shrink-0 rounded-full px-2.5"
                         >
-                          {formatDate(doc.lastModified)}
+                          {formatDateShort(doc.lastModified)}
                         </Badge>
                       </div>
                     </CardContent>
