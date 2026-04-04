@@ -4,7 +4,7 @@
 # Usage: ./build-and-save.sh [version]
 
 VERSION=${1:-latest}
-IMAGE_NAME="cys-wiki"
+IMAGE_NAME="any-documentation"
 TAR_FILE="${IMAGE_NAME}-${VERSION}.tar.gz"
 
 echo "🏗️  Building Docker image: ${IMAGE_NAME}:${VERSION}"
@@ -26,7 +26,7 @@ if [ $? -eq 0 ]; then
         echo ""
         echo "🚀 Di server, jalankan:"
         echo "gunzip -c ${TAR_FILE} | docker load"
-        echo "docker run -d -p 3000:3000 --name cys-wiki-app --restart unless-stopped ${IMAGE_NAME}:${VERSION}"
+        echo "docker run -d -p 3000:3000 --name any-documentation-app --restart unless-stopped ${IMAGE_NAME}:${VERSION}"
     else
         echo "❌ Gagal save image"
         exit 1

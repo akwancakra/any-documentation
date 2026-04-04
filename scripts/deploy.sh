@@ -23,7 +23,7 @@ docker-compose down || true
 # Remove old images and clear cache
 echo "🗑️  Clearing Docker cache and removing old images..."
 docker system prune -f
-docker rmi cys-wiki_app:latest || true
+docker rmi any-documentation_app:latest || true
 
 # Pull latest changes (jika deploying dari git)
 # echo "📥 Pulling latest changes..."

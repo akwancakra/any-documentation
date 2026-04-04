@@ -25,30 +25,34 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# curl untuk HEALTHCHECK (Alpine minimal)
+RUN apk add --no-cache curl
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 cys-wiki
+RUN adduser --system --uid 1001 any-documentation
 
 # Copy built application
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
 RUN mkdir .next
-RUN chown cys-wiki:nodejs .next
+RUN chown any-documentation:nodejs .next
 
 # Automatically leverage output traces to reduce image size
-COPY --from=builder --chown=cys-wiki:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=cys-wiki:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=any-documentation:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=any-documentation:nodejs /app/.next/static ./.next/static
 
-# Copy content directory (untuk dynamic MDX loading)
-COPY --chown=cys-wiki:nodejs content ./content
+# MDX docs: gunakan S3 di prod (DOCS_STORAGE=s3). Jangan bundle content/docs ke image.
 
-USER cys-wiki
+USER any-documentation
 
 EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Start the application
-CMD ["node", "server.js"] 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD curl -sf http://127.0.0.1:3000/api/health > /dev/null || exit 1
+
+CMD ["node", "server.js"]

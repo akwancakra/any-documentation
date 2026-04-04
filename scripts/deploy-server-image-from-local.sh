@@ -5,12 +5,12 @@
 
 TAR_FILE=$1
 PORT=${2:-3000}
-IMAGE_NAME="cys-wiki"
-CONTAINER_NAME="cys-wiki-app"
+IMAGE_NAME="any-documentation"
+CONTAINER_NAME="any-documentation-app"
 
 if [ -z "$TAR_FILE" ]; then
     echo "❌ Usage: ./deploy-server.sh <tar-file> [port]"
-    echo "   Example: ./deploy-server.sh cys-wiki-latest.tar.gz 3000"
+    echo "   Example: ./deploy-server.sh any-documentation-latest.tar.gz 3000"
     exit 1
 fi
 

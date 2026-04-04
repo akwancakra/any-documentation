@@ -1,5 +1,5 @@
 {
-  "name": "cys-wiki",
+  "name": "any-documentation",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -12,7 +12,8 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "verify:docs-storage": "tsx scripts/verify-docs-storage.ts"
+    "verify:docs-storage": "tsx scripts/verify-docs-storage.ts",
+    "type-check": "tsc --noEmit"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -36,7 +36,7 @@ Platform dokumentasi berbasis MDX dengan autentikasi lokal (PostgreSQL + NextAut
 
 ```bash
 git clone [repository-url]
-cd cys-wiki
+cd any-documentation
 cp env.template .env.local
 # Edit .env.local: DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL
 
@@ -62,7 +62,7 @@ SEED_ADMIN_PASSWORD=changeme123
 ## 📁 Project Structure
 
 ```
-cys-wiki/
+any-documentation/
 ├── src/
 │   ├── app/
 │   │   ├── api/
@@ -257,8 +257,8 @@ npm run build
 npm run start
 
 # Or use Docker
-docker build -t cys-wiki .
-docker run -p 3000:3000 cys-wiki
+docker build -t any-documentation .
+docker run -p 3000:3000 any-documentation
 ```
 
 ### Environment Variables (Production)

@@ -27,10 +27,10 @@ Aplikasi akan tersedia di: http://localhost:3000
 
 ```bash
 # Build image
-docker build -t cys-wiki .
+docker build -t any-documentation .
 
 # Jalankan container
-docker run -p 3000:3000 --name cys-wiki-app cys-wiki
+docker run -p 3000:3000 --name any-documentation-app any-documentation
 ```
 
 ## Perintah Berguna
@@ -58,16 +58,16 @@ docker-compose down -v --remove-orphans
 docker ps
 
 # Stop container
-docker stop cys-wiki-app
+docker stop any-documentation-app
 
 # Hapus container
-docker rm cys-wiki-app
+docker rm any-documentation-app
 
 # Hapus image
-docker rmi cys-wiki
+docker rmi any-documentation
 
 # Lihat logs container
-docker logs cys-wiki-app -f
+docker logs any-documentation-app -f
 ```
 
 ## Environment Variables
@@ -89,7 +89,7 @@ Kemudian update `docker-compose.yml`:
 
 ```yaml
 services:
-  cys-wiki:
+  any-documentation:
     # ... konfigurasi lainnya
     env_file:
       - .env
@@ -158,7 +158,7 @@ Untuk development dengan hot reload, gunakan:
 
 ```bash
 # Jalankan dalam mode development
-docker run -p 3000:3000 -v $(pwd):/app -v /app/node_modules cys-wiki npm run dev
+docker run -p 3000:3000 -v $(pwd):/app -v /app/node_modules any-documentation npm run dev
 ```
 
 Atau buat `docker-compose.dev.yml`:
@@ -167,7 +167,7 @@ Atau buat `docker-compose.dev.yml`:
 version: "3.8"
 
 services:
-  cys-wiki-dev:
+  any-documentation-dev:
     build:
       context: .
       dockerfile: Dockerfile.dev # Buat Dockerfile khusus untuk dev

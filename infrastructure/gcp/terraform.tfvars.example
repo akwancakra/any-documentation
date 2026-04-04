@@ -1,0 +1,54 @@
+# Copy this file to terraform.tfvars (do not commit terraform.tfvars)
+#
+
+project_name = "any-documentation"
+environment  = "dev"
+
+# GCP basics
+gcp_project_id        = "your-gcp-project-id"
+gcp_billing_account_id = "000000-000000-000000"
+region                = "asia-southeast2"   # Jakarta
+gcp_zone              = "asia-southeast2-a"
+
+# GitHub repository for OIDC/WIF trust (format: owner/repo)
+github_repository = "OWNER/your-github-repo"
+
+# Runtime (Cloud Run)
+container_image_tag             = "latest"
+cloud_run_cpu                   = "1"
+cloud_run_memory                = "512Mi"
+cloud_run_min_instances         = 0
+cloud_run_max_instances         = 2
+cloud_run_allow_unauthenticated = true
+
+# Database (Cloud SQL PostgreSQL)
+db_name                = "wiki"
+db_username            = "wikiuser"
+db_password            = "CHANGE_ME_STRONG_PASSWORD_MIN_12"
+db_tier                = "db-f1-micro"
+db_disk_size_gb        = 20
+db_disk_type           = "PD_SSD"
+db_availability_type   = "ZONAL"
+db_deletion_protection = false
+db_backup_enabled      = true
+db_pitr_enabled        = false
+db_allowed_cidr        = "0.0.0.0/0" # Not recommended for production
+
+# Application secrets
+nextauth_secret = "CHANGE_ME_LONG_RANDOM_STRING"
+gemini_api_key  = "" # optional
+
+# Storage (GCS + Artifact Registry)
+docs_bucket_location            = "ASIA-SOUTHEAST2"
+docs_bucket_force_destroy       = false
+artifact_registry_repository_id = "app"
+artifact_registry_format        = "DOCKER"
+
+# Budget alert (optional)
+alert_email        = ""
+monthly_budget_usd = 35
+
+# Extra labels (optional)
+labels = {
+  team = "platform"
+}

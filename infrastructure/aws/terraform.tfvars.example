@@ -1,0 +1,20 @@
+# Salin ke terraform.tfvars (jangan commit terraform.tfvars)
+
+project_name    = "any-documentation"
+environment     = "dev"
+aws_region      = "ap-southeast-1"
+github_repository = "OWNER/nama-repo-github-anda"
+
+# RDS
+db_password = "GANTI_PASSWORD_KUAT_MIN_8"
+
+# App
+nextauth_secret = "GANTI_RANDOM_STRING_PANJANG"
+gemini_api_key  = "" # opsional
+
+# Budget AWS (kosongkan jika tidak ingin budget)
+alert_email = ""
+
+# CIDR untuk koneksi Postgres dari luar VPC (GitHub Actions hosted runner).
+# Sempitkan ke IP statis Anda jika memungkinkan. 0.0.0.0/0 = tidak aman untuk prod.
+rds_allowed_cidr = "0.0.0.0/0"

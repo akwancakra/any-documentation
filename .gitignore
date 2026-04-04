@@ -34,3 +34,19 @@ yarn-error.log*
 .env
 .vercel
 next-env.d.ts
+
+# Terraform (infrastructure/aws)
+infrastructure/aws/.terraform/
+infrastructure/aws/*.tfstate
+infrastructure/aws/*.tfstate.*
+infrastructure/aws/terraform.tfvars
+infrastructure/aws/crash.log
+infrastructure/aws/override.tf
+
+# Terraform (infrastructure/gcp)
+infrastructure/gcp/.terraform/
+infrastructure/gcp/*.tfstate
+infrastructure/gcp/*.tfstate.*
+infrastructure/gcp/terraform.tfvars
+infrastructure/gcp/crash.log
+infrastructure/gcp/override.tf

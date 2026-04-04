@@ -4,7 +4,7 @@
 # Script ini monitor perubahan file di content/docs dan auto-rebuild container
 
 WATCH_DIR="./content/docs"
-CONTAINER_NAME="cys-wiki-app"
+CONTAINER_NAME="any-documentation-app"
 COMPOSE_FILE="docker-compose.yml"
 
 echo "🔄 Starting auto-rebuild monitor..."
