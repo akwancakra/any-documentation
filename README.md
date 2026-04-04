@@ -1,49 +1,49 @@
 # Any Documentation
 
-Platform dokumentasi berbasis **MDX** (Fumadocs) dengan autentikasi lokal: **PostgreSQL**, **Prisma**, **NextAuth** (Credentials), **bcrypt**, dan **RBAC** (admin / user). Dibangun dengan **Next.js 15** (App Router) dan **React 19**.
+An **MDX** documentation platform (Fumadocs) with local authentication: **PostgreSQL**, **Prisma**, **NextAuth** (Credentials), **bcrypt**, and **RBAC** (admin / user). Built with **Next.js 15** (App Router) and **React 19**.
 
 <p align="center">
   <img
     src="public/images/landingpage-screenshot.png"
-    alt="Cuplikan landing page Any Docs — hero, navigasi, dan grid dokumen terbaru"
+    alt="Any Docs landing page — hero, navigation, and latest docs grid"
     width="780"
   />
 </p>
 
 <p align="center">
-  <strong>Any Docs</strong> — landing modern dengan tema gelap, pencarian cepat (<kbd>Ctrl</kbd>+<kbd>K</kbd> / <kbd>⌘K</kbd>), dan daftar dokumen MDX terbaru.
+  <strong>Any Docs</strong> — modern landing with dark theme, quick search (<kbd>Ctrl</kbd>+<kbd>K</kbd> / <kbd>⌘K</kbd>), and latest MDX documents.
 </p>
 
 ---
 
-## Fitur utama
+## Highlights
 
-### Autentikasi & keamanan
+### Authentication & security
 
-- **PostgreSQL + Prisma** — user di database; password di-hash dengan bcrypt
-- **RBAC** — admin (editor, dashboard, login logs) vs user (akses docs sesuai policy)
-- **Login audit** — pencatatan login ke database (metadata request / device)
+- **PostgreSQL + Prisma** — users in the database; passwords hashed with bcrypt
+- **RBAC** — admin (editor, dashboard, login logs) vs user (doc access per middleware rules)
+- **Login audit** — sign-in events stored in the database (request/device metadata)
 
-### Dashboard admin
+### Admin dashboard
 
-- Statistik dokumen & aktivitas file
-- **Login logs** — monitoring aktivitas login (`/dashboard/login-logs`)
-- UI responsif & tema terang/gelap
+- Document stats & file activity
+- **Login logs** — monitor sign-ins (`/dashboard/login-logs`)
+- Responsive UI & light/dark theme
 
-### Platform dokumentasi
+### Documentation platform
 
-- **MDX** dengan komponen Fumadocs (Tabs, Accordion, Callout, dll.)
-- **Pencarian** — dialog pencarian terintegrasi (Fumadocs UI)
-- **Editor** — dua mode untuk admin: live preview (Tiptap) & split view (Monaco + preview)
-- **Penyimpanan konten** — filesystem lokal atau **S3** (opsional)
+- **MDX** with Fumadocs components (Tabs, Accordion, Callout, etc.)
+- **Search** — integrated search dialog (Fumadocs UI)
+- **Editor** — two modes for admins: live preview (Tiptap) & split view (Monaco + preview)
+- **Content storage** — local filesystem or **S3** (optional)
 
 ---
 
-## Persyaratan
+## Requirements
 
 - Node.js **18+**
-- PostgreSQL **14+** (lokal atau Docker)
-- `npm` / `pnpm` / `yarn`
+- PostgreSQL **14+** (local or Docker)
+- `npm`, `pnpm`, or `yarn`
 
 ## Quick start
 
@@ -52,67 +52,67 @@ git clone <repository-url>
 cd any-documentation
 
 cp env.template .env.local
-# Isi: DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL (lihat env.template)
+# Set DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL (see env.template)
 
-# Postgres (contoh Docker):
+# Postgres (Docker example):
 # docker compose --profile with-postgres up -d
 
 npm install
-npm run db:migrate   # atau: npm run db:push
-npm run db:seed      # user admin awal (lihat SEED_* di env)
+npm run db:migrate   # or: npm run db:push
+npm run db:seed      # initial admin user (see SEED_* in env)
 npm run dev
 ```
 
-Buka [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000).
 
-### Variabel lingkungan (ringkas)
+### Environment (minimal)
 
 ```env
 DATABASE_URL=postgresql://USER:PASS@localhost:5432/wiki?schema=public
-NEXTAUTH_SECRET=minimal-32-karakter-random
+NEXTAUTH_SECRET=at-least-32-random-characters
 NEXTAUTH_URL=http://localhost:3000
 SEED_ADMIN_EMAIL=admin@example.com
 SEED_ADMIN_PASSWORD=changeme123
 ```
 
-Detail lengkap: [`env.template`](./env.template), [`docs/ENVIRONMENT_VARIABLES.md`](./docs/ENVIRONMENT_VARIABLES.md).
+Full reference: [`env.template`](./env.template), [`docs/ENVIRONMENT_VARIABLES.md`](./docs/ENVIRONMENT_VARIABLES.md).
 
 ---
 
-## Skrip npm
+## npm scripts
 
-| Skrip | Keterangan |
-|--------|------------|
+| Script | Description |
+|--------|-------------|
 | `npm run dev` | Development server (Turbopack) |
-| `npm run build` | Build production (`prisma generate` + `next build`) |
-| `npm run start` | Server production (`next start`) |
+| `npm run build` | Production build (`prisma generate` + `next build`) |
+| `npm run start` | Production server (`next start`) |
 | `npm run lint` / `npm run lint:fix` | ESLint (Next.js) |
 | `npm run type-check` | `tsc --noEmit` |
 | `npm run db:*` | Prisma migrate / push / seed / studio |
-| `npm run pm2:start` | Jalankan app dengan PM2 (`ecosystem.config.cjs`) |
-| `npm run pm2:logs` | Tail log PM2 |
-| `npm run pm2:reload` | Reload proses PM2 |
+| `npm run pm2:start` | Run app with PM2 (`ecosystem.config.cjs`) |
+| `npm run pm2:logs` | Tail PM2 logs |
+| `npm run pm2:reload` | Reload PM2 process |
 
 ---
 
-## Produksi & PM2
+## Production & PM2
 
-Setelah `npm run build`:
+After `npm run build`:
 
 ```bash
 npm run pm2:start    # NODE_ENV=production via --env production
 npm run pm2:logs
 ```
 
-Konfigurasi: [`ecosystem.config.cjs`](./ecosystem.config.cjs) — log di folder `logs/` (di-ignore Git).
+Config: [`ecosystem.config.cjs`](./ecosystem.config.cjs) — logs under `logs/` (gitignored).
 
-Alternatif tanpa PM2:
+Without PM2:
 
 ```bash
 npm run build && npm run start
 ```
 
-Docker (jika memakai image proyek ini):
+Docker (if using this repo’s image):
 
 ```bash
 docker build -t any-documentation .
@@ -121,73 +121,73 @@ docker run -p 3000:3000 --env-file .env any-documentation
 
 ---
 
-## Struktur proyek (ringkas)
+## Project layout (overview)
 
 ```
 any-documentation/
 ├── src/app/                 # App Router: (home), (auth), docs, dashboard, editor, api
-├── src/components/          # UI & shell bersama
-├── src/lib/                 # Auth, MDX, storage docs (fs/S3), utilitas
-├── content/docs/            # File MDX (dapat diabaikan Git untuk konten pribadi)
-├── prisma/                  # Schema, migrasi, seed
-├── public/images/           # Aset statis (termasuk screenshot landing di README)
+├── src/components/          # Shared UI & shell
+├── src/lib/                 # Auth, MDX, docs storage (fs/S3), utilities
+├── content/docs/            # MDX files (may be gitignored for private content)
+├── prisma/                  # Schema, migrations, seed
+├── public/images/           # Static assets (incl. README screenshot)
 ├── ecosystem.config.cjs     # PM2
 ├── env.template
-└── docs/                    # Panduan setup & environment
+└── docs/                    # Setup & environment guides
 ```
 
 ---
 
-## Rute penting
+## Main routes
 
-| Rute | Deskripsi | Akses |
-|------|-----------|--------|
-| `/` | Landing | Publik |
-| `/login` | Login | Publik |
-| `/docs` | Dokumentasi MDX | Sesuai middleware / session |
-| `/dashboard` | Dashboard admin | Admin |
-| `/dashboard/login-logs` | Log login | Admin |
-| `/editor/create`, `/editor/edit/...` | Editor MDX | Admin |
-
----
-
-## Alur autentikasi (ringkas)
-
-1. Email + password dikirim ke NextAuth Credentials.
-2. User dicari di PostgreSQL (email unik, case-insensitive).
-3. Password diverifikasi dengan `bcrypt.compare`.
-4. Role dibaca dari `users.role` (`admin` | `user`).
-5. Session JWT memuat `role` dan `id`; aktivitas login dapat dicatat ke tabel `login_logs` (Prisma).
+| Route | Description | Access |
+|-------|-------------|--------|
+| `/` | Landing | Public |
+| `/login` | Sign in | Public |
+| `/docs` | MDX docs | Per middleware / session |
+| `/dashboard` | Admin dashboard | Admin |
+| `/dashboard/login-logs` | Login logs | Admin |
+| `/editor/create`, `/editor/edit/...` | MDX editor | Admin |
 
 ---
 
-## Editor dokumentasi
+## Authentication flow (short)
+
+1. Email + password are sent to NextAuth Credentials.
+2. User is looked up in PostgreSQL (unique email, case-insensitive).
+3. Password is verified with `bcrypt.compare`.
+4. Role is read from `users.role` (`admin` | `user`).
+5. JWT session carries `role` and `id`; sign-in events can be written to the `login_logs` table (Prisma).
+
+---
+
+## Documentation editors
 
 1. **Live preview** — [`src/app/editor/_components/editor.tsx`](./src/app/editor/_components/editor.tsx) (Tiptap + preview).
-2. **Split view (kode)** — [`src/app/editor/_components/split-view-editor.tsx`](./src/app/editor/_components/split-view-editor.tsx) (Monaco + preview, AI enhance opsional).
+2. **Split view (code)** — [`src/app/editor/_components/split-view-editor.tsx`](./src/app/editor/_components/split-view-editor.tsx) (Monaco + preview, optional AI enhance).
 
-Saat **buat dokumen baru**, dialog memilih tipe editor. **Edit** dokumen yang ada memakai split view.
-
----
-
-## Komponen MDX (cuplikan)
-
-Lihat [`src/mdx-components.tsx`](./src/mdx-components.tsx) dan dokumentasi Fumadocs. Contoh: `Accordion`, `Banner`, `Tabs`, `Steps`, `ImageZoom`, `PDFViewer`, `VideoViewer`, dll.
+When **creating** a new document, a dialog selects the editor type. **Editing** an existing document uses split view.
 
 ---
 
-## Dokumentasi tambahan
+## MDX components
 
-| File | Isi |
-|------|-----|
-| [`docs/SETUP.md`](./docs/SETUP.md) | Setup cepat |
-| [`docs/ADMIN_SETUP.md`](./docs/ADMIN_SETUP.md) | Peran admin |
-| [`docs/ENVIRONMENT_VARIABLES.md`](./docs/ENVIRONMENT_VARIABLES.md) | Referensi env |
+See [`src/mdx-components.tsx`](./src/mdx-components.tsx) and Fumadocs docs. Examples: `Accordion`, `Banner`, `Tabs`, `Steps`, `ImageZoom`, `PDFViewer`, `VideoViewer`, etc.
+
+---
+
+## Further documentation
+
+| File | Topics |
+|------|--------|
+| [`docs/SETUP.md`](./docs/SETUP.md) | Quick setup |
+| [`docs/ADMIN_SETUP.md`](./docs/ADMIN_SETUP.md) | Admin roles |
+| [`docs/ENVIRONMENT_VARIABLES.md`](./docs/ENVIRONMENT_VARIABLES.md) | Environment reference |
 | [`docs/LOGIN_LOGGING.md`](./docs/LOGIN_LOGGING.md) | Login logging |
 
 ---
 
-## Teknologi
+## Stack
 
 - [Next.js](https://nextjs.org/docs) · [React](https://react.dev/)
 - [NextAuth.js](https://next-auth.js.org/)
@@ -197,6 +197,6 @@ Lihat [`src/mdx-components.tsx`](./src/mdx-components.tsx) dan dokumentasi Fumad
 
 ---
 
-## Lisensi & kontribusi
+## License & support
 
-Sesuai repositori ini. Untuk isu teknis: periksa log browser, log server, serta `DATABASE_URL` dan variabel `NEXTAUTH_*` di environment production.
+Per this repository. For issues: check browser and server logs, and verify `DATABASE_URL` and `NEXTAUTH_*` in production.

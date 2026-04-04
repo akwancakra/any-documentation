@@ -1,137 +1,106 @@
-# Panduan Docker untuk Any Documentation
+# Docker — Any Documentation
 
-Dokumen ini berisi petunjuk lengkap untuk menjalankan aplikasi Any Documentation menggunakan Docker.
+Run Any Documentation with Docker and Docker Compose.
 
 ## Prerequisites
-
-Pastikan Anda sudah menginstall:
 
 - [Docker](https://www.docker.com/get-started)
 - [Docker Compose](https://docs.docker.com/compose/install/)
 
-## Quick Start
+## Quick start
 
-### 1. Menggunakan Docker Compose (Recommended)
+### 1. Docker Compose (recommended)
 
 ```bash
-# Build dan jalankan aplikasi
-docker-compose up --build
+docker compose up --build
 
-# Atau jalankan di background
-docker-compose up -d --build
+# Or in the background
+docker compose up -d --build
 ```
 
-Aplikasi akan tersedia di: http://localhost:3000
+The app is available at http://localhost:3000
 
-### 2. Menggunakan Docker Manual
+### 2. Docker only
 
 ```bash
-# Build image
 docker build -t any-documentation .
 
-# Jalankan container
 docker run -p 3000:3000 --name any-documentation-app any-documentation
 ```
 
-## Perintah Berguna
+## Useful commands
 
 ### Docker Compose
 
 ```bash
-# Lihat logs
-docker-compose logs -f
-
-# Stop aplikasi
-docker-compose down
-
-# Rebuild image
-docker-compose build --no-cache
-
-# Hapus semua containers dan volumes
-docker-compose down -v --remove-orphans
+docker compose logs -f
+docker compose down
+docker compose build --no-cache
+docker compose down -v --remove-orphans
 ```
 
-### Docker Manual
+### Docker CLI
 
 ```bash
-# Lihat containers yang berjalan
 docker ps
-
-# Stop container
 docker stop any-documentation-app
-
-# Hapus container
 docker rm any-documentation-app
-
-# Hapus image
 docker rmi any-documentation
-
-# Lihat logs container
 docker logs any-documentation-app -f
 ```
 
-## Environment Variables
+## Environment variables
 
-Anda bisa menambahkan environment variables dengan membuat file `.env` di root project:
+Create a `.env` file in the project root:
 
 ```env
-# .env
 NODE_ENV=production
 PORT=3000
 HOSTNAME=0.0.0.0
-
-# Tambahkan variabel lain sesuai kebutuhan
-# NEXTAUTH_SECRET=your-secret-here
+# NEXTAUTH_SECRET=...
 # NEXTAUTH_URL=http://localhost:3000
+# DATABASE_URL=...
 ```
 
-Kemudian update `docker-compose.yml`:
+Wire it in `docker-compose.yml` if needed:
 
 ```yaml
 services:
   any-documentation:
-    # ... konfigurasi lainnya
     env_file:
       - .env
 ```
 
 ## Troubleshooting
 
-### Port sudah digunakan
+### Port already in use
 
-Jika port 3000 sudah digunakan, ubah port di `docker-compose.yml`:
+Change the host port in `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "3001:3000" # Ubah ke port lain
+  - "3001:3000"
 ```
 
-### Build error
-
-Jika ada error saat build, coba:
+### Build errors
 
 ```bash
-# Clear Docker cache
 docker system prune -a
-
-# Rebuild tanpa cache
-docker-compose build --no-cache
+docker compose build --no-cache
 ```
 
-### Memory issues
+### Out of memory
 
-Jika build gagal karena memory, tambahkan swap atau tingkatkan memory limit Docker.
+Add swap or increase Docker’s memory limit.
 
-## Production Deployment
+## Production checklist
 
-Untuk production, pastikan:
+1. Set all required environment variables (database, NextAuth, etc.).
+2. Use a reverse proxy (nginx, Traefik).
+3. Enable TLS.
+4. Configure logging and monitoring.
 
-1. Set environment variables yang tepat
-2. Gunakan reverse proxy (nginx/traefik)
-3. Setup SSL certificate
-4. Configure logging dan monitoring
-
-### Contoh nginx config:
+### Example nginx location block
 
 ```nginx
 server {
@@ -152,41 +121,14 @@ server {
 }
 ```
 
-## Development
+## Development with hot reload
 
-Untuk development dengan hot reload, gunakan:
-
-```bash
-# Jalankan dalam mode development
-docker run -p 3000:3000 -v $(pwd):/app -v /app/node_modules any-documentation npm run dev
-```
-
-Atau buat `docker-compose.dev.yml`:
-
-```yaml
-version: "3.8"
-
-services:
-  any-documentation-dev:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev # Buat Dockerfile khusus untuk dev
-    ports:
-      - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
-    environment:
-      - NODE_ENV=development
-    command: npm run dev
-```
+For local dev, prefer `npm run dev` on the host. Optionally mount the repo into a container (ensure `node_modules` handling matches your setup).
 
 ## Support
 
-Jika mengalami masalah, periksa:
+1. `docker compose logs`
+2. `docker ps -a`
+3. `docker images`
 
-1. Docker logs: `docker-compose logs`
-2. Container status: `docker ps -a`
-3. Image build: `docker images`
-
-Untuk bantuan lebih lanjut, buka issue di repository ini.
+Open an issue on the repository if problems persist.

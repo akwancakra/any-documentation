@@ -1,15 +1,15 @@
-# 🚀 Production Deployment Guide
+# Production deployment guide
 
-Guide lengkap untuk deploy **Any Documentation** ke production server menggunakan Docker.
+End-to-end notes for deploying **Any Documentation** to a production server with Docker.
 
-## 📋 Prerequisites
+## Prerequisites
 
-- Server dengan **Docker** dan **Docker Compose** terinstall
-- **Git** untuk clone repository
-- **Domain** (optional, bisa pakai IP)
-- **SSL Certificate** (optional untuk HTTPS)
+- **Docker** and **Docker Compose** on the server
+- **Git** to clone the repository
+- **Domain** (optional; IP works for testing)
+- **TLS certificate** (recommended for HTTPS)
 
-## 🛠️ Setup Server
+## Server setup
 
 ### 1. Install Docker & Docker Compose
 
@@ -19,146 +19,118 @@ curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
 sudo usermod -aG docker $USER
 
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
+# Docker Compose plugin (or standalone binary per Docker docs)
+sudo apt-get update && sudo apt-get install docker-compose-plugin
 ```
 
-### 2. Clone Repository
+### 2. Clone the repository
 
 ```bash
 git clone https://github.com/your-username/cys-fumadocs.git
 cd cys-fumadocs
 ```
 
-## ⚙️ Configuration
+## Configuration
 
-### 1. Environment Variables
+### 1. Environment variables
 
 ```bash
-# Copy template environment
-cp env-template.txt .env
-
-# Edit environment variables
+cp env.template .env
+# Edit values for production (database, NextAuth, etc.)
 nano .env
 ```
 
-**Minimum required variables:**
+**Minimum example (add database + NextAuth for real deployments):**
 
 ```env
 NODE_ENV=production
 PORT=3000
 HOSTNAME=0.0.0.0
 NEXT_TELEMETRY_DISABLED=1
+DATABASE_URL=postgresql://...
+NEXTAUTH_SECRET=...
+NEXTAUTH_URL=https://your-domain.com
 ```
 
-### 2. Domain Configuration (Optional)
+### 2. Domain (optional)
 
-Edit `nginx.conf` jika menggunakan custom domain:
+If you use the bundled `nginx.conf`, set `server_name`:
 
 ```nginx
 server_name your-domain.com www.your-domain.com;
 ```
 
-## 🚀 Deployment Options
+## Deployment options
 
-### Option 1: Simple Deployment (Port 3000)
-
-Deploy aplikasi langsung di port 3000:
+### Option 1: App on port 3000
 
 ```bash
-# Run deployment script
 ./deploy.sh
 ```
 
-**Akses aplikasi:** `http://server-ip:3000`
+**URL:** `http://SERVER_IP:3000`
 
-### Option 2: With Nginx Reverse Proxy (Port 80/443)
-
-Deploy dengan Nginx untuk production-ready setup:
+### Option 2: Nginx reverse proxy (ports 80/443)
 
 ```bash
-# Deploy dengan Nginx
-docker-compose --profile with-nginx up -d --build
+docker compose --profile with-nginx up -d --build
 ```
 
-**Akses aplikasi:** `http://server-ip` atau `http://your-domain.com`
+**URL:** `http://SERVER_IP` or `http://your-domain.com`
 
-## 📁 File Structure di Server
+## Layout on the server
 
 ```
 cys-fumadocs/
-├── content/           # 📝 MDX files (volume mounted)
-├── public/           # 🖼️ Static files (volume mounted)
-├── docker-compose.yml # 🐳 Docker configuration
-├── Dockerfile        # 🏗️ App build instructions
-├── nginx.conf        # 🌐 Nginx configuration
-├── deploy.sh         # 🚀 Deployment script
-└── .env             # ⚙️ Environment variables
+├── content/            # MDX files (often volume-mounted)
+├── public/             # Static assets (often volume-mounted)
+├── docker-compose.yml
+├── Dockerfile
+├── nginx.conf
+├── deploy.sh
+└── .env
 ```
 
-## 🔧 Management Commands
+## Operations
 
-### Basic Operations
+### Basics
 
 ```bash
-# View logs
-docker-compose logs -f app
-
-# Stop application
-docker-compose down
-
-# Restart application
-docker-compose restart app
-
-# Update application (rebuild)
+docker compose logs -f app
+docker compose down
+docker compose restart app
 ./deploy.sh
-
-# Update application (no rebuild)
-docker-compose pull && docker-compose up -d
+docker compose pull && docker compose up -d
 ```
 
-### Content Management
+### Content
 
 ```bash
-# Edit MDX files directly
 nano content/docs/your-file.mdx
-
-# Add new images
 cp image.png public/docs/images/
-
-# Content akan update otomatis dalam 30 detik!
 ```
 
-### System Monitoring
+Content visibility depends on your **storage** (`fs` vs `S3`) and **Next.js caching / revalidation** settings. After file changes, you may need a short wait or a manual revalidate if configured.
+
+### Monitoring
 
 ```bash
-# Check container status
-docker-compose ps
-
-# Check resource usage
+docker compose ps
 docker stats
-
-# Health check
-curl http://localhost:3000/api/health
-
-# View system logs
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
 journalctl -u docker -f
 ```
 
-## 🔄 File Updates - INSTANT!
+## Dynamic content
 
-Dengan **dynamic rendering**, file baru akan **langsung muncul**:
+With **dynamic rendering** and storage-backed docs, new MDX files can appear **without** rebuilding the image, subject to:
 
-1. **Upload MDX baru** → `content/docs/new-file.mdx`
-2. **Langsung akses** → `http://your-domain.com/docs/new-file`
-3. **Auto-refresh** → Cache 30 detik, update otomatis
+1. Files written where the app reads them (local volume or S3 sync).
+2. Route handlers calling `revalidatePath` / `revalidateTag` where applicable.
 
-**No rebuild needed!** ⚡
+## Security
 
-## 🛡️ Security Considerations
-
-### 1. Nginx Security Headers
+### Nginx headers (example)
 
 ```nginx
 add_header X-Frame-Options "SAMEORIGIN" always;
@@ -166,54 +138,34 @@ add_header X-Content-Type-Options "nosniff" always;
 add_header X-XSS-Protection "1; mode=block" always;
 ```
 
-### 2. Rate Limiting
+### Rate limiting (example)
 
 ```nginx
 limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
 ```
 
-### 3. SSL/HTTPS Setup
+### TLS
 
-1. **Obtain SSL certificate** (Let's Encrypt recommended)
-2. **Uncomment HTTPS section** in `nginx.conf`
-3. **Update certificate paths**
+1. Obtain a certificate (e.g. Let’s Encrypt).
+2. Enable HTTPS in `nginx.conf`.
+3. Point certificate paths to real files.
 
 ```bash
-# Let's Encrypt example
 sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d your-domain.com
 ```
 
-## 📊 Monitoring & Logs
-
-### Application Logs
+## Logs
 
 ```bash
-# Real-time logs
-docker-compose logs -f app
-
-# Specific service logs
-docker-compose logs -f nginx
-
-# Last 100 lines
-docker-compose logs --tail=100 app
+docker compose logs -f app
+docker compose logs -f nginx
+docker compose logs --tail=100 app
 ```
 
-### Health Monitoring
+## Troubleshooting
 
-```bash
-# Check application health
-curl http://localhost:3000/api/health
-
-# Monitor uptime
-while true; do curl -s http://localhost:3000/api/health | jq '.status'; sleep 10; done
-```
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-1. **Port 3000 already in use**
+1. **Port 3000 in use**
 
    ```bash
    sudo lsof -i :3000
@@ -227,28 +179,21 @@ while true; do curl -s http://localhost:3000/api/health | jq '.status'; sleep 10
    newgrp docker
    ```
 
-3. **Container won't start**
+3. **Container fails**
 
    ```bash
-   docker-compose logs app
-   docker-compose down && docker-compose up -d --build
+   docker compose logs app
+   docker compose down && docker compose up -d --build
    ```
 
-4. **Content not updating**
+4. **Stale content**
 
    ```bash
-   # Check volume mounts
-   docker-compose exec app ls -la /app/content
-
-   # Clear app cache
-   docker-compose restart app
+   docker compose exec app ls -la /app/content
+   docker compose restart app
    ```
 
-### Performance Optimization
-
-1. **Enable Gzip compression** (Already configured in nginx.conf)
-2. **Static file caching** (Already configured)
-3. **Resource limits** (Add to docker-compose.yml if needed)
+### Resource limits (optional)
 
 ```yaml
 services:
@@ -260,26 +205,23 @@ services:
           memory: 1G
 ```
 
-## 🎯 Production Checklist
+## Production checklist
 
-- [ ] **Docker & Docker Compose** installed
-- [ ] **Environment variables** configured
-- [ ] **Domain/DNS** pointing to server (if using custom domain)
-- [ ] **SSL certificate** obtained (for HTTPS)
-- [ ] **Firewall rules** configured (ports 80, 443, 22)
-- [ ] **Backup strategy** implemented for content files
-- [ ] **Monitoring** setup (logs, health checks)
-- [ ] **Security headers** enabled in Nginx
+- [ ] Docker & Compose installed
+- [ ] `.env` complete (`DATABASE_URL`, `NEXTAUTH_*`, etc.)
+- [ ] DNS points to server (if using a domain)
+- [ ] TLS configured
+- [ ] Firewall allows 80, 443, 22 as needed
+- [ ] Backups for DB and/or `content/`
+- [ ] Log rotation / monitoring
 
-## 🆘 Support
+## Support
 
-Jika ada masalah deployment:
-
-1. **Check logs:** `docker-compose logs -f`
-2. **Health check:** `curl http://localhost:3000/api/health`
-3. **Restart services:** `docker-compose restart`
-4. **Full rebuild:** `./deploy.sh`
+1. `docker compose logs -f`
+2. `curl -I http://localhost:3000/`
+3. `docker compose restart`
+4. Full rebuild: `./deploy.sh`
 
 ---
 
-✨ **Happy Deploying!** Aplikasi akan jalan di server dengan **instant file updates** dan **production-ready** configuration!
+**Happy deploying** — tune caching and revalidation for your workload so doc updates behave as you expect.

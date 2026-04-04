@@ -1,77 +1,71 @@
-# Role-Based Access Control (RBAC)
+# Role-based access control (RBAC)
 
-Dokumentasi sistem kontrol akses berdasarkan role dalam aplikasi Any Documentation.
+How access is enforced in Any Documentation.
 
-## Roles yang Tersedia
+## Roles
 
-### 1. Admin
+### Admin
 
-- **Akses penuh** ke semua fitur aplikasi
-- Dapat membuat, mengedit, dan menghapus dokumentasi
-- Akses ke dashboard admin dan login logs
-- Dapat mengakses editor untuk membuat/edit docs
+- Full access to app features
+- Create, update, and delete documentation (per API rules)
+- Admin dashboard and login logs
+- Editor routes for creating/editing docs
 
-### 2. User
+### User
 
-- **Akses terbatas** untuk membaca dokumentasi
-- Dapat mengakses dashboard user
-- Dapat membaca semua dokumentasi di `/docs`
-- **Tidak dapat** mengakses editor atau admin features
+- Limited access (read docs and dashboard per middleware)
+- Can use `/docs` as allowed by `middleware.ts`
+- **Cannot** use editor-only or admin-only features
 
-## Route Access Matrix
+## Route matrix
 
-| Route                   | Public | User | Admin | Keterangan                                  |
-| ----------------------- | ------ | ---- | ----- | ------------------------------------------- |
-| `/`                     | ✅     | ✅   | ✅    | Homepage (redirect ke dashboard jika login) |
-| `/login`                | ✅     | 🚫   | 🚫    | Login page (redirect jika sudah login)      |
-| `/docs/**`              | ✅     | ✅   | ✅    | Dokumentasi (public access)                 |
-| `/dashboard`            | 🚫     | ✅   | ✅    | Dashboard utama                             |
-| `/dashboard/login-logs` | 🚫     | 🚫   | ✅    | Login logs (admin only)                     |
-| `/editor/**`            | 🚫     | 🚫   | ✅    | Editor untuk create/edit docs (admin only)  |
-| `/api/auth/**`          | ✅     | ✅   | ✅    | NextAuth API routes                         |
+| Route                   | Public | User | Admin | Notes |
+| ----------------------- | ------ | ---- | ----- | ----- |
+| `/`                     | ✅     | ✅   | ✅    | Home (authenticated users may be redirected per middleware) |
+| `/login`                | ✅     | —    | —     | Login (redirect if already signed in) |
+| `/docs/**`              | ✅*    | ✅*  | ✅*   | *Per your `middleware.ts` / session rules |
+| `/dashboard`            | 🚫     | ✅†  | ✅    | †If allowed for non-admin in your deployment |
+| `/dashboard/login-logs` | 🚫     | 🚫   | ✅    | Admin only |
+| `/editor/**`            | 🚫     | 🚫   | ✅    | Admin only |
+| `/api/auth/**`          | ✅     | ✅   | ✅    | NextAuth routes |
 
-## Implementasi Middleware
+Adjust the table if your middleware differs.
 
-### Public Routes
+## Middleware behavior (typical)
 
-Routes yang bisa diakses tanpa login:
+### Public routes
 
-- `/` - Homepage
-- `/login` - Login page
-- `/api/auth/**` - Authentication APIs
-- `/docs/**` - Documentation (read-only)
+Examples often include:
 
-### Protected Routes
+- `/` — landing
+- `/login`
+- `/api/auth/**`
+- `/docs/**` — may be public or require auth (check `middleware.ts`)
 
-Routes yang memerlukan authentication:
+### Protected routes
 
-- `/dashboard` - User dan Admin
-- `/editor/**` - Admin only
-- `/dashboard/login-logs` - Admin only
+- `/dashboard` — requires authentication
+- `/editor/**` — admin only
+- `/dashboard/login-logs` — admin only
 
-### Redirect Logic
+### Redirects (examples)
 
-1. **User belum login** → Redirect ke `/login`
-2. **User sudah login di `/login`** → Redirect ke `/dashboard`
-3. **User sudah login di `/`** → Redirect ke `/dashboard`
-4. **User tanpa akses** → Redirect ke `/dashboard?error=access-denied`
-5. **Invalid role** → Redirect ke `/login?error=invalid-role`
+1. Unauthenticated user hits protected route → `/login`
+2. Authenticated user on `/login` → `/dashboard` (or home)
+3. Authenticated user on `/` → may redirect to `/dashboard` (project-specific)
+4. Forbidden role → `/dashboard?error=access-denied` or similar
 
-## Error Handling
+## Error query parameters
 
-### Query Parameters untuk Error
+- `?error=access-denied` — missing permission for the page
+- `?error=invalid-role` — role not valid for the resource
+- `?error=unauthorized` — not allowed
 
-- `?error=access-denied` - User tidak memiliki akses ke halaman tersebut
-- `?error=invalid-role` - Role user tidak valid
-- `?error=unauthorized` - Akses tidak diizinkan
+Handle these in client UI where appropriate.
 
-### Client-side Handling
+## Usage examples
 
-Setiap halaman protected harus menghandle error query parameters dan menampilkan pesan yang sesuai.
-
-## Contoh Penggunaan
-
-### Di Client Component
+### Client component
 
 ```tsx
 import { useSession } from "next-auth/react";
@@ -90,11 +84,12 @@ function MyComponent() {
 }
 ```
 
-### Di Server Component
+### Server component
 
 ```tsx
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/lib/auth-options";
 import { isAdmin } from "@/lib/auth-utils";
 
 export default async function ServerPage() {
@@ -111,15 +106,9 @@ export default async function ServerPage() {
 
 ## Debugging
 
-Middleware akan log setiap request dengan format:
+If middleware logs requests, verify:
 
-```
-=== Middleware: /path, token: true/false, role: admin/user
-```
-
-Untuk debugging access control issues, cek console logs untuk melihat:
-
-1. Path yang diakses
-2. Status token (ada/tidak)
-3. Role user
-4. Redirect decisions
+1. Request path
+2. Whether a session/token is present
+3. User role
+4. Redirect target

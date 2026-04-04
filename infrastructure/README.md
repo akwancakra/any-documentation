@@ -1,32 +1,29 @@
 # Infrastructure
 
-Folder ini berisi **Terraform stacks** yang dipisah per cloud provider.
+This folder contains **Terraform stacks** split by cloud provider.
 
-## Struktur
+## Layout
 
-- `aws/` → stack Terraform untuk AWS
-- `gcp/` → stack Terraform untuk GCP
+- `aws/` — Terraform stack for AWS
+- `gcp/` — Terraform stack for GCP
 
----
+## Design goals
 
-## Tujuan desain
+Both stacks target an **equivalent architecture** (same concepts, provider-native resources) so that:
 
-Kedua stack menggunakan **arsitektur ekuivalen** (konsep sama, resource native berbeda), sehingga:
+- comparing or switching providers is straightforward
+- CI/CD patterns stay consistent
+- state is isolated per provider
 
-- mudah berpindah/membandingkan provider
-- CI/CD bisa konsisten
-- isolasi state lebih aman per provider
+## Shared contract (recommended)
 
----
+Use aligned variable/output names across stacks where possible.
 
-## Shared contract (disarankan)
+### Common inputs
 
-Agar pipeline/deployment tetap seragam, gunakan nama variabel/output yang sepadan di kedua stack.
-
-### Input umum
 - `project_name`
 - `environment`
-- `region` (atau padanan provider)
+- `region` (or provider equivalent)
 - `db_name`
 - `db_username`
 - `db_password` (sensitive)
@@ -35,7 +32,8 @@ Agar pipeline/deployment tetap seragam, gunakan nama variabel/output yang sepada
 - `alert_email` (optional)
 - `github_repository`
 
-### Output umum
+### Common outputs
+
 - `app_url`
 - `container_repository`
 - `docs_bucket`
@@ -45,64 +43,62 @@ Agar pipeline/deployment tetap seragam, gunakan nama variabel/output yang sepada
 
 ---
 
-## Cara pakai (AWS)
+## AWS usage
 
-```/dev/null/infrastructure-readme-aws.sh#L1-8
+```bash
 cd infrastructure/aws
 cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars sesuai environment
+# Edit terraform.tfvars for your environment
 terraform init
 terraform plan
 terraform apply
 ```
 
----
+## GCP usage
 
-## Cara pakai (GCP)
-
-```/dev/null/infrastructure-readme-gcp.sh#L1-8
+```bash
 cd infrastructure/gcp
 cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars sesuai environment
+# Edit terraform.tfvars for your environment
 terraform init
 terraform plan
 terraform apply
 ```
 
-> Catatan GCP: pastikan `gcp_project_id` dan `gcp_billing_account_id` valid.
+> **GCP:** ensure `gcp_project_id` and `gcp_billing_account_id` are valid.
 
 ---
 
-## State & keamanan
+## State & security
 
-- Simpan state remote:
-  - AWS: backend S3 (+ lock table bila dipakai)
-  - GCP: backend GCS
-- Jangan commit:
+- Use **remote state**:
+  - AWS: S3 backend (+ DynamoDB lock table if used)
+  - GCP: GCS backend
+- Do **not** commit:
   - `terraform.tfvars`
   - `*.tfstate`
   - `.terraform/`
-- Semua secret harus lewat secret manager/provider secret store, bukan hardcoded.
+- Secrets belong in a secret manager or provider secret store, not in Git.
 
 ---
 
-## Migrasi dari struktur lama
+## Migration from older layout
 
-Root `infrastructure/` sekarang hanya folder pengelompokan.
-Terraform aktif ada di:
+The root `infrastructure/` folder is only a grouping layer. Active Terraform lives in:
+
 - `infrastructure/aws`
 - `infrastructure/gcp`
 
-Jika ada script lama yang masih mengarah ke `infrastructure/`, update ke subfolder provider yang benar.
+If older scripts still point at `infrastructure/`, update them to the correct provider subfolder.
 
 ---
 
-## Konvensi workflow tim
+## Team conventions
 
-- Buat perubahan provider-specific di folder masing-masing.
-- Hindari copy-paste tanpa penyesuaian resource native provider.
-- Saat menambah komponen baru, update kedua stack agar tetap ekuivalen.
-- Validasi minimal:
+- Make provider-specific changes inside each provider folder.
+- Avoid blind copy-paste; adapt to each cloud’s native resources.
+- When adding a new component, update **both** stacks when you need feature parity.
+- Minimum checks:
   - `terraform fmt -check`
   - `terraform validate`
   - `terraform plan`

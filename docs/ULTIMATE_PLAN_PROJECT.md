@@ -11,7 +11,7 @@
 1. [Project Overview](#1-project-overview)
 2. [High-Level Architecture](#2-high-level-architecture)
 3. [Tech Stack & Decision Log](#3-tech-stack--decision-log)
-4. [Phase 1 — Penyimpanan Dokumen MDX di S3](#4-phase-1--penyimpanan-dokumen-mdx-di-s3)
+4. [Phase 1 — MDX document storage on S3](#4-phase-1--mdx-document-storage-on-s3)
 5. [Phase 2 — Infrastructure as Code (Terraform)](#5-phase-2--infrastructure-as-code-terraform)
 6. [Phase 3 — CI/CD Pipeline (GitHub Actions)](#6-phase-3--cicd-pipeline-github-actions)
 7. [Phase 4 — Security & Production Hardening](#7-phase-4--security--production-hardening)
@@ -27,27 +27,27 @@
 
 ## 1. Project Overview
 
-**any-documentation** (Any Documentation) adalah platform dokumentasi berbasis MDX dengan editor WYSIWYG, autentikasi admin, dan fitur AI (Gemini) untuk generate & improve konten. Project ini dirancang sebagai **production-grade portfolio** yang membuktikan kemampuan Cloud Engineering, DevOps, dan Quality Assurance secara end-to-end.
+**any-documentation** (Any Documentation) is an **MDX** documentation platform with a WYSIWYG editor, admin authentication, and optional **AI** (e.g. Gemini) to generate and improve content. It is designed as a **production-grade portfolio** showcasing Cloud Engineering, DevOps, and QA **end-to-end**.
 
 ### Goals
 
 | Goal                | Detail                                                                   |
 | ------------------- | ------------------------------------------------------------------------ |
-| **Functional**      | CRUD dokumen MDX, live rendering, AI-powered content via Gemini          |
-| **Infrastructure**  | Monolith Next.js di AWS ECS Fargate + RDS PostgreSQL + S3 untuk docs MDX |
-| **DevOps**          | Pipeline CI/CD otomatis (GitHub Actions + OIDC), zero manual deployment  |
-| **Security**        | Least privilege IAM, secrets di Secrets Manager, rate limiting, HTTPS    |
+| **Functional**      | CRUD MDX docs, live rendering, AI-assisted content via Gemini            |
+| **Infrastructure**  | Monolithic Next.js on AWS ECS Fargate + RDS PostgreSQL + S3 for MDX docs |
+| **DevOps**          | Automated CI/CD (GitHub Actions + OIDC), minimal manual deploy          |
+| **Security**        | Least-privilege IAM, secrets in Secrets Manager, rate limiting, HTTPS   |
 | **Observability**   | CloudWatch Logs, alarms, structured logging                              |
-| **QA Portfolio**    | Piramida testing: unit (Vitest) + E2E (Playwright) + manual checklist    |
-| **Portfolio Value** | Demonstrasi skill Cloud/DevOps/QA nyata ke recruiter                     |
+| **QA portfolio**    | Test pyramid: unit (Vitest) + E2E (Playwright) + manual checklist       |
+| **Portfolio value** | Concrete Cloud / DevOps / QA skills for hiring portfolios               |
 
-### Keputusan Arsitektur Utama: Monolith Container (bukan serverless split)
+### Main architecture choice: monolith container (not a split serverless design)
 
-Aplikasi ini menggunakan **Next.js standalone container di ECS Fargate** — bukan static export + Lambda terpisah. Alasannya:
+The app runs as a **Next.js standalone container on ECS Fargate** — not static export + separate Lambda. Rationale:
 
-- App membutuhkan **server-side rendering dinamis** (MDX live per-request, NextAuth session, Prisma).
-- **Satu unit deploy** lebih mudah di-debug, di-rollback, dan dijelaskan.
-- **Trade-off yang disadari**: tidak memanfaatkan free tier Lambda, tapi arsitektur lebih representatif untuk aplikasi production nyata.
+- The app needs **dynamic SSR** (live MDX per request, NextAuth session, Prisma).
+- **One deployable unit** is easier to debug, roll back, and explain.
+- **Known trade-off**: you do not use the Lambda free tier, but the shape matches many **real production** Next.js deployments.
 
 ---
 
@@ -95,7 +95,7 @@ Monitoring Layer:
 CloudWatch Logs → CloudWatch Metrics → CloudWatch Alarms → SNS (email alert)
 ```
 
-### Data Flow: Baca Halaman Docs
+### Data flow: read docs page
 
 ```
 Browser → ALB → ECS Task
@@ -106,7 +106,7 @@ Browser → ALB → ECS Task
                     └─ return rendered RSC
 ```
 
-### Data Flow: Simpan/Edit Dokumen (Admin)
+### Data flow: save / edit document (admin)
 
 ```
 Browser → ALB → ECS Task → /api/save-file
@@ -116,12 +116,12 @@ Browser → ALB → ECS Task → /api/save-file
                                 └─ appendActivityLog → RDS
 ```
 
-### Data Flow: AI Generate Content
+### Data flow: AI content enhancement
 
 ```
 Browser → ALB → ECS Task → /api/ai-enhance
                                 │
-                                ├─ Baca GEMINI_API_KEY dari env (inject via Secrets Manager)
+                                ├─ Read GEMINI_API_KEY from env (injected via Secrets Manager)
                                 ├─ Call Gemini Flash API
                                 └─ Return { enhancedContent }
 ```
@@ -130,65 +130,65 @@ Browser → ALB → ECS Task → /api/ai-enhance
 
 ## 3. Tech Stack & Decision Log
 
-| Layer              | Pilihan                          | Alasan                                                                   |
+| Layer              | Choice                           | Rationale                                                                |
 | ------------------ | -------------------------------- | ------------------------------------------------------------------------ |
-| **Frontend/App**   | Next.js 15 App Router            | SSR + force-dynamic MDX rendering, monolith sederhana, standalone output |
-| **Database**       | PostgreSQL via Prisma            | Relasional (User, LoginLog, FileLog), schema konsisten, Prisma type-safe |
-| **DB Hosting**     | Amazon RDS PostgreSQL            | Managed, backup, encryption, VPC private, kompatibel Prisma              |
-| **Compute**        | ECS Fargate                      | Serverless container, tidak ada server management, scale-down ke 0       |
-| **Load Balancer**  | ALB                              | HTTPS termination, health check, sticky session opsional                 |
-| **Docs Storage**   | S3 (via `DocsStorage` abstraksi) | MDX file persisten lintas task, versioning opsional, enkripsi at-rest    |
-| **Secrets**        | Secrets Manager / SSM            | DATABASE_URL, NEXTAUTH_SECRET, Gemini key — tidak disimpan di image      |
-| **IaC**            | Terraform                        | Reproducible, versioned, industry standard                               |
-| **CI/CD**          | GitHub Actions + OIDC            | Native integration, tanpa static credential, gratis untuk public repo    |
-| **AI Model**       | Gemini Flash / Flash-Lite        | Free tier, powerful untuk content generation                             |
-| **Monitoring**     | CloudWatch                       | Native AWS, zero setup tambahan                                          |
-| **Testing**        | Vitest + Playwright + manual     | Piramida testing untuk showcase QA                                       |
+| **Frontend/app**   | Next.js 15 App Router            | SSR + dynamic MDX rendering; simple monolith; standalone output          |
+| **Database**       | PostgreSQL via Prisma            | Relational (User, LoginLog, FileLog); consistent schema; type-safe ORM   |
+| **DB hosting**     | Amazon RDS PostgreSQL            | Managed backups, encryption, private VPC, Prisma-friendly               |
+| **Compute**        | ECS Fargate                      | Serverless containers; no host management; scale-to-zero optional         |
+| **Load balancer**  | ALB                              | HTTPS termination, health checks, optional sticky sessions                |
+| **Docs storage**   | S3 (via `DocsStorage`)           | Durable MDX across tasks; optional versioning; encryption at rest         |
+| **Secrets**        | Secrets Manager / SSM            | DATABASE_URL, NEXTAUTH_SECRET, Gemini key — not baked into images         |
+| **IaC**            | Terraform                        | Reproducible, versioned, industry standard                                |
+| **CI/CD**          | GitHub Actions + OIDC            | Native GitHub integration; no long-lived cloud keys in CI for public repos |
+| **AI model**       | Gemini Flash / Flash-Lite        | Useful free tier; strong for content workflows                           |
+| **Monitoring**     | CloudWatch                       | Native AWS; no extra vendor setup                                          |
+| **Testing**        | Vitest + Playwright + manual     | Test pyramid for QA portfolio demos                                      |
 | **Image Registry** | Amazon ECR                       | Private, native ECS integration, lifecycle policy                        |
 
 ---
 
-## 4. Phase 1 — Penyimpanan Dokumen MDX di S3
+## 4. Phase 1 — MDX document storage on S3
 
-**Status**: Selesai diimplementasikan  
-**Output**: Abstraksi `DocsStorage` dengan adapter `fs` (lokal) dan `s3` (AWS).
+**Status:** Implemented  
+**Deliverable:** `DocsStorage` abstraction with `fs` (local) and `s3` (AWS) adapters.
 
-### Konsep
+### Concept
 
-Semua baca/tulis file MDX di `content/docs` melewati satu interface terpusat (`DocsStorage`). Backend dipilih lewat env:
+All MDX reads/writes under `content/docs` go through a single interface (`DocsStorage`). The backend is selected via env:
 
-- `DOCS_STORAGE=fs` — baca/tulis ke disk lokal (default untuk dev)
-- `DOCS_STORAGE=s3` — baca/tulis ke S3 bucket (untuk prod ECS)
+- `DOCS_STORAGE=fs` — read/write local disk (default for dev)
+- `DOCS_STORAGE=s3` — read/write S3 bucket (typical for ECS prod)
 
-### Struktur Modul
+### Module layout
 
 ```
 src/lib/docs-storage/
 ├── types.ts        # Interface DocsStorage
-├── keys.ts         # Normalisasi key, validasi path traversal, .keep marker
-├── fs-storage.ts   # Implementasi filesystem (dev / single-instance)
-├── s3-storage.ts   # Implementasi S3 (@aws-sdk/client-s3)
+├── keys.ts         # Key normalization, path traversal checks, .keep marker
+├── fs-storage.ts   # Filesystem implementation (dev / single instance)
+├── s3-storage.ts   # S3 implementation (@aws-sdk/client-s3)
 └── index.ts        # getDocsStorage() — singleton + env toggle
 src/lib/
 ├── mdx-utils.ts        # getAllMDXFiles, getMDXFileBySlug — via DocsStorage
 ├── docs-file-tree.ts   # buildDocsFileTree — FS: readdir; S3: list keys
-└── docs-revalidate.ts  # revalidateDocsContent() terpusat
+└── docs-revalidate.ts  # central revalidateDocsContent()
 ```
 
-### Folder Kosong di S3
+### Empty folders on S3
 
-S3 tidak punya konsep direktori. Saat admin membuat folder baru, sebuah **marker object** `folder/.keep` (0 byte) dibuat. Pohon file di editor dibentuk dari listing key + infal prefix.
+S3 has no real directories. When an admin creates a folder, a **marker object** `folder/.keep` (0 bytes) is written. The editor tree is derived from listing object keys and prefix rules.
 
-### Variabel Environment
+### Environment variables
 
 ```bash
 DOCS_STORAGE=s3
-DOCS_S3_BUCKET=nama-bucket
-DOCS_S3_PREFIX=          # opsional, mis. wiki-docs/
+DOCS_S3_BUCKET=your-bucket-name
+DOCS_S3_PREFIX=          # optional, e.g. wiki-docs/
 AWS_REGION=ap-southeast-1
 ```
 
-### IAM Task Role (contoh)
+### IAM task role (example)
 
 ```json
 {
@@ -199,33 +199,33 @@ AWS_REGION=ap-southeast-1
     "s3:DeleteObject",
     "s3:ListBucket"
   ],
-  "Resource": ["arn:aws:s3:::NAMA_BUCKET", "arn:aws:s3:::NAMA_BUCKET/*"]
+  "Resource": ["arn:aws:s3:::YOUR_BUCKET", "arn:aws:s3:::YOUR_BUCKET/*"]
 }
 ```
 
-### Seed Awal Bucket
+### Initial bucket seed
 
 ```bash
-export DOCS_S3_BUCKET=nama-bucket
+export DOCS_S3_BUCKET=your-bucket-name
 ./scripts/sync-content-docs-to-s3.sh
-# atau: aws s3 sync ./content/docs s3://NAMA_BUCKET/PREFIX --delete
+# or: aws s3 sync ./content/docs s3://BUCKET_NAME/PREFIX --delete
 ```
 
 ---
 
 ## 5. Phase 2 — Infrastructure as Code (Terraform)
 
-**Estimasi waktu**: 2–3 hari  
-**Output**: Semua AWS resource terprovision secara reproducible dan versioned.
+**Estimated effort:** 2–3 days  
+**Deliverable:** All AWS resources provisioned in a reproducible, versioned way.
 
-### Struktur Folder
+### Directory layout
 
 ```
 infrastructure/
 ├── main.tf              # Provider, remote state, resource utama
 ├── variables.tf         # Input variables
 ├── terraform.tfvars     # Actual values (gitignored)
-├── outputs.tf           # Output: ALB URL, ECR repo, dll
+├── outputs.tf           # Outputs: ALB URL, ECR repo, etc.
 ├── modules/
 │   ├── network/         # VPC, subnets, security groups
 │   ├── compute/         # ECS cluster, service, task definition, ALB
@@ -239,7 +239,7 @@ infrastructure/
 
 ```hcl
 variable "project_name" {
-  description = "Prefix semua resource AWS"
+  description = "Prefix for all AWS resources"
   type        = string
   default     = "any-documentation"
 }
@@ -270,7 +270,7 @@ variable "gemini_api_key" {
 }
 ```
 
-### Resource Utama
+### Core resources
 
 ```hcl
 # ECR — image registry
@@ -278,7 +278,7 @@ resource "aws_ecr_repository" "app" {
   name                 = "${var.project_name}-${var.environment}"
   image_tag_mutability = "MUTABLE"
   lifecycle_policy {
-    # Simpan hanya 10 image terakhir
+    # Keep only the last 10 images
     policy = jsonencode({
       rules = [{ rulePriority = 1, action = { type = "expire" },
         selection = { tagStatus = "any", countType = "imageCountMoreThan", countNumber = 10 } }]
@@ -301,7 +301,7 @@ resource "aws_db_instance" "postgres" {
   db_subnet_group_name   = aws_db_subnet_group.main.name
   storage_encrypted      = true
   backup_retention_period = 7
-  deletion_protection    = false  # set true di prod nyata
+  deletion_protection    = false  # set true in real production
 }
 
 # S3 — MDX Docs Storage
@@ -379,7 +379,7 @@ resource "aws_iam_role_policy" "ecs_task_policy" {
 }
 ```
 
-### Urutan Eksekusi
+### Execution order
 
 ```bash
 # 1. Init
@@ -391,20 +391,20 @@ terraform plan -var-file="terraform.tfvars"
 # 3. Apply
 terraform apply -var-file="terraform.tfvars"
 
-# 4. Lihat output
+# 4. Show outputs
 terraform output
 ```
 
-> **Simpan** `terraform.tfvars` di `.gitignore`. CI/CD inject variabel via env (`TF_VAR_db_password`, dll.).
+> **Keep** `terraform.tfvars` out of git (`.gitignore`). In CI/CD, inject variables via env (`TF_VAR_db_password`, etc.).
 
 ---
 
 ## 6. Phase 3 — CI/CD Pipeline (GitHub Actions)
 
-**Estimasi waktu**: 2 hari  
-**Output**: Setiap `git push` ke `main` otomatis test → build → deploy.
+**Estimated time:** 2 days  
+**Deliverable:** Each `git push` to `main` runs test → build → deploy.
 
-### Prinsip Pipeline
+### Pipeline flow
 
 ```
 git push → Actions trigger
@@ -413,11 +413,11 @@ git push → Actions trigger
     ▼                          ▼
 test (lint + Vitest)     Playwright E2E (staging)
     │
-    ▼ (merge ke main)
+    ▼ (merge to main)
 build Docker image
     │
     ▼
-push ke ECR
+push to ECR
     │
     ▼
 deploy ECS (rolling update)
@@ -428,16 +428,16 @@ smoke test production
 
 ### Setup GitHub Secrets
 
-| Secret           | Nilai                                  |
-| ---------------- | -------------------------------------- |
-| `AWS_ROLE_ARN`   | ARN IAM Role OIDC untuk GitHub Actions |
-| `AWS_REGION`     | `ap-southeast-1`                       |
-| `ECR_REPOSITORY` | URL ECR repo                           |
-| `ECS_CLUSTER`    | Nama cluster ECS                       |
-| `ECS_SERVICE`    | Nama service ECS                       |
-| `DOCS_S3_BUCKET` | Nama bucket MDX docs                   |
+| Secret             | Value                                   |
+| ------------------ | --------------------------------------- |
+| `AWS_ROLE_ARN`     | IAM role ARN (OIDC) for GitHub Actions |
+| `AWS_REGION`       | `ap-southeast-1`                        |
+| `ECR_REPOSITORY`   | ECR repository URL                     |
+| `ECS_CLUSTER`      | ECS cluster name                       |
+| `ECS_SERVICE`      | ECS service name                       |
+| `DOCS_S3_BUCKET`   | MDX docs S3 bucket name                |
 
-### OIDC (Tanpa Static Credential)
+### OIDC (no long-lived static credentials)
 
 ```hcl
 resource "aws_iam_openid_connect_provider" "github" {
@@ -522,7 +522,7 @@ jobs:
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
-      - name: Seed docs S3 (hanya jika ada perubahan di content/docs)
+      - name: Seed docs S3 (when content/docs changes in the commit)
         run: |
           aws s3 sync ./content/docs s3://${{ secrets.DOCS_S3_BUCKET }} --delete
 
@@ -542,7 +542,7 @@ jobs:
       - name: Smoke test
         run: |
           ALB_URL="${{ secrets.ALB_URL }}"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$ALB_URL/api/health")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$ALB_URL/")
           [ "$STATUS" = "200" ] || (echo "Smoke test FAILED: HTTP $STATUS" && exit 1)
           echo "Smoke test OK"
 ```
@@ -551,27 +551,27 @@ jobs:
 
 ## 7. Phase 4 — Security & Production Hardening
 
-**Estimasi waktu**: 1–2 hari
+**Estimated time:** 1–2 days
 
-### Checklist Security
+### Security checklist
 
-| Area           | Implementasi                                             | Status    |
+| Area           | Implementation                                           | Status    |
 | -------------- | -------------------------------------------------------- | --------- |
-| IAM            | Least privilege task role (S3 + Secrets Manager only)    | Wajib     |
-| Secrets        | DATABASE_URL, NEXTAUTH_SECRET, Gemini di Secrets Manager | Wajib     |
-| S3 MDX         | Block public access + enkripsi AES-256                   | Wajib     |
-| ALB            | HTTPS only, redirect HTTP → HTTPS                        | Wajib     |
-| RDS            | Private subnet, security group strict (hanya dari ECS)   | Wajib     |
-| Auth           | NextAuth admin-only untuk edit/save/delete               | Sudah ada |
-| Path traversal | `normalizeDocRelKey` menolak `..` sebelum ke storage     | Sudah ada |
-| Logging        | Tidak log `GEMINI_API_KEY`, password, session token      | Wajib     |
-| WAF            | Basic OWASP rule set via AWS WAF (opsional)              | Opsional  |
+| IAM            | Least-privilege task role (S3 + Secrets Manager only)    | Required |
+| Secrets        | DATABASE_URL, NEXTAUTH_SECRET, Gemini in Secrets Manager | Required |
+| S3 MDX         | Block public access + AES-256 encryption                  | Required |
+| ALB            | HTTPS only, redirect HTTP → HTTPS                         | Required |
+| RDS            | Private subnet; strict SG (only from ECS)                  | Required |
+| Auth           | NextAuth: admin-only for edit/save/delete                 | In place |
+| Path traversal | `normalizeDocRelKey` rejects `..` before storage I/O       | In place |
+| Logging        | Never log `GEMINI_API_KEY`, passwords, or session tokens   | Required |
+| WAF            | Basic OWASP rule set via AWS WAF                          | Optional |
 
-### Logging Aman (contoh)
+### Safe logging (example)
 
 ```typescript
-// src/lib/docs-revalidate.ts — tidak ada secret di sini
-// Semua secret hanya di env/container; tidak di log
+// src/lib/docs-revalidate.ts — no secrets in this module
+// All secrets live in env / container; do not log them
 
 const SENSITIVE_FIELDS = ["apiKey", "password", "token", "secret"];
 function sanitizeForLog(obj: Record<string, unknown>) {
@@ -588,12 +588,12 @@ function sanitizeForLog(obj: Record<string, unknown>) {
 
 ### Rate Limit AI Endpoint
 
-Tambahkan middleware pada `/api/ai-enhance`:
+Add middleware / guards on `/api/ai-enhance`:
 
 ```typescript
-// Contoh sederhana in-memory (per instance); untuk multi-instance: DynamoDB counter
+// Simple in-memory example per instance; for multi-instance consider DynamoDB / Redis
 const rateLimitMap = new Map<string, { count: number; window: number }>();
-const LIMIT = 10; // per menit per IP/user
+const LIMIT = 10; // per minute per IP/user
 
 function isRateLimited(key: string): boolean {
   const now = Math.floor(Date.now() / 60000);
@@ -612,16 +612,16 @@ function isRateLimited(key: string): boolean {
 
 ## 8. Phase 5 — Testing Strategy (QA Showcase)
 
-**Estimasi waktu**: 3–4 hari  
-**Coverage target**: Minimal 80% untuk logika kritis.
+**Estimated time:** 3–4 days  
+**Coverage target:** At least ~80% for critical logic.
 
-### Piramida Testing
+### Test pyramid
 
 ```
          ▲
         / \
        /   \      E2E — Playwright
-      /     \     · Login → buka editor → simpan MDX → verifikasi
+      /     \     · Login → open editor → save MDX → verify
      /───────\
     /         \   Integration — Vitest + fetch mock
    /           \  · POST /api/save-file, /api/files, /api/docs/count
@@ -648,7 +648,7 @@ export default defineConfig({
 ```
 
 ```typescript
-// scripts/verify-docs-storage.ts — sudah ada, jalankan via:
+// scripts/verify-docs-storage.ts — already in repo; run via:
 // npm run verify:docs-storage
 ```
 
@@ -662,7 +662,7 @@ test("menolak path traversal", () => {
   expect(() => normalizeDocRelKey("../evil")).toThrow();
 });
 
-test("normalise backslash jadi posix", () => {
+test("normalise backslash to posix", () => {
   expect(normalizeDocRelKey("a\\b.mdx")).toBe("a/b.mdx");
 });
 
@@ -683,16 +683,16 @@ npx playwright install
 // tests/e2e/editor.spec.ts
 import { test, expect } from "@playwright/test";
 
-test("admin dapat buat dan lihat dokumen baru", async ({ page }) => {
+test("admin can create and view a new document", async ({ page }) => {
   await page.goto("/login");
   await page.fill('[name="email"]', process.env.SEED_ADMIN_EMAIL!);
   await page.fill('[name="password"]', process.env.SEED_ADMIN_PASSWORD!);
   await page.click('button[type="submit"]');
 
   await page.goto("/editor/create");
-  await page.fill('[data-testid="title-input"]', "Test Halaman E2E");
+  await page.fill('[data-testid="title-input"]', "E2E Test Page");
   await page.click('[data-testid="save-btn"]');
-  await expect(page.locator("text=Test Halaman E2E")).toBeVisible();
+  await expect(page.locator("text=E2E Test Page")).toBeVisible();
 });
 ```
 
@@ -701,33 +701,33 @@ test("admin dapat buat dan lihat dokumen baru", async ({ page }) => {
 ```markdown
 ## Auth
 
-- [ ] Login admin valid → masuk dashboard
-- [ ] Login salah password → error jelas
-- [ ] Akses /editor tanpa login → redirect /login
+- [ ] Valid admin login → lands on dashboard
+- [ ] Wrong password → clear error message
+- [ ] Visit /editor while logged out → redirect to /login
 
 ## CRUD MDX
 
-- [ ] Buat dokumen baru → muncul di /docs
-- [ ] Edit konten → perubahan tampil tanpa rebuild image
-- [ ] Hapus dokumen → hilang dari sidebar
-- [ ] Rename/pindah folder → path URL ikut berubah
+- [ ] Create document → appears under /docs
+- [ ] Edit content → changes visible without rebuilding the image
+- [ ] Delete document → removed from sidebar
+- [ ] Rename/move folder → URL path updates accordingly
 
 ## AI Feature
 
-- [ ] Enhance teks → Gemini memberikan respons
-- [ ] Prompt kosong → error yang jelas
-- [ ] Hit >10x/menit → 429 rate limit
+- [ ] Enhance text → Gemini returns a response
+- [ ] Empty AI prompt → clear validation error
+- [ ] More than 10 requests/minute → 429 rate limit
 
 ## Security
 
-- [ ] Coba akses S3 bucket langsung → 403
-- [ ] Path `../../etc/passwd` di filePath API → 403
-- [ ] Request save tanpa auth → 401
+- [ ] Direct S3 bucket access without IAM → 403
+- [ ] Path `../../etc/passwd` in filePath API → 403
+- [ ] Save request without auth → 401
 
 ## Performance
 
-- [ ] Halaman /docs load < 2 detik (warm request)
-- [ ] Simpan dokumen → halaman update tanpa full reload
+- [ ] /docs loads in under 2s (warm request)
+- [ ] Save document → page refreshes content without full reload
 ```
 
 ---
@@ -796,14 +796,14 @@ resource "aws_sns_topic_subscription" "email" {
 ### CloudWatch Logs Insights
 
 ```sql
--- Error pada API docs
+-- API errors on docs routes
 fields @timestamp, @message
 | filter @message like /ERROR/
 | filter @log like /ecs/
 | sort @timestamp desc
 | limit 20
 
--- Latency tinggi
+-- High latency (save-file)
 fields @timestamp, @message
 | filter @message like /save-file/
 | parse @message "duration=*ms" as latency
@@ -814,20 +814,20 @@ fields @timestamp, @message
 
 ## 10. Cost Management & Free Tier Guard
 
-### Estimasi Biaya Bulanan (portfolio/dev)
+### Rough monthly cost (portfolio / dev)
 
-| Service             | Free Tier / Catatan           | Estimasi Usage        | Biaya             |
-| ------------------- | ----------------------------- | --------------------- | ----------------- |
-| ECS Fargate         | Tidak ada free tier           | 0.25 vCPU, 0.5 GB RAM | ~$5–10/bulan      |
-| RDS db.t3.micro     | 750 jam/bulan free (12 bulan) | 1 instance            | $0 (free tier)    |
-| S3 Docs             | 5 GB, 20K GET free            | ~50 MB, ~500 req      | $0                |
-| ALB                 | Tidak ada free tier           | ~$16/bulan minimum    | ~$16              |
-| CloudWatch Logs     | 5 GB ingest free              | ~100 MB               | $0                |
-| ECR                 | 500 MB/bulan free             | ~200 MB               | $0                |
-| Secrets Manager     | $0.40/secret/bulan            | 1 secret              | ~$0.40            |
-| **Total perkiraan** |                               |                       | **~$20–30/bulan** |
+| Service             | Free tier / notes              | Typical usage         | Est. cost         |
+| ------------------- | ------------------------------ | --------------------- | ----------------- |
+| ECS Fargate         | No free tier                   | 0.25 vCPU, 0.5 GB RAM | ~$5–10/mo        |
+| RDS db.t3.micro     | 750 hrs/mo (first 12 months)   | 1 instance            | $0 (free tier)    |
+| S3 Docs             | 5 GB, 20K GET free             | ~50 MB, ~500 req      | $0                |
+| ALB                 | No free tier                   | ~$16/mo minimum       | ~$16              |
+| CloudWatch Logs     | 5 GB ingest free               | ~100 MB               | $0                |
+| ECR                 | 500 MB/mo free                 | ~200 MB               | $0                |
+| Secrets Manager     | ~$0.40/secret/mo               | 1 secret              | ~$0.40            |
+| **Total (rough)**   |                                |                       | **~$20–30/mo**   |
 
-> **Tip**: Untuk menghemat: gunakan **App Runner** ($0 saat tidak ada traffic) sebagai alternatif ALB + ECS; atau matikan ECS service saat tidak dipakai.
+> **Tip:** To save cost, consider **App Runner** (~$0 when idle) instead of ALB + ECS, or stop the ECS service when not in use.
 
 ### Budget Alert
 
@@ -861,41 +861,41 @@ resource "aws_budgets_budget" "monthly" {
 3. prisma migrate deploy → RDS
 4. docker build + push ECR
 5. ECS rolling update
-6. Smoke test /api/health
+6. Smoke test a public URL (e.g. `/` or `/docs`; align with your ALB health path)
 7. Manual testing checklist
-8. Approval → pipeline prod (jika ada multi-env)
-9. Monitor CloudWatch 15 menit pertama
+8. Approval → promote to prod pipeline (if you use multiple environments)
+9. Watch CloudWatch for the first 15 minutes
 ```
 
 ### Rollback Procedures
 
 ```bash
-# Rollback ECS ke image sebelumnya
+# Roll back ECS to the previous task image
 aws ecs update-service \
   --cluster CLUSTER_NAME \
   --service SERVICE_NAME \
   --task-definition TASK_DEF_ARN_PREVIOUS
 
-# Rollback MDX docs ke S3 versi sebelumnya (jika versioning enabled)
-aws s3api list-object-versions --bucket BUCKET --prefix path/ke/file.mdx
-aws s3api get-object --bucket BUCKET --key path/ke/file.mdx \
+# Roll back MDX in S3 to a prior version (if versioning is enabled)
+aws s3api list-object-versions --bucket BUCKET --prefix path/to/file.mdx
+aws s3api get-object --bucket BUCKET --key path/to/file.mdx \
   --version-id VERSION_ID restored-file.mdx
 
-# Rollback Terraform
+# Roll back Terraform (targeted apply)
 terraform state list
 terraform apply -target=aws_ecs_service.app -var-file="terraform.tfvars"
 ```
 
 ### Future Improvements (Roadmap)
 
-| Priority | Feature                          | Catatan                                             |
-| -------- | -------------------------------- | --------------------------------------------------- |
-| High     | Playwright E2E di CI             | Jalan saat staging deploy                           |
-| Medium   | App Runner sebagai alternatif    | Lebih murah untuk portfolio, scale to zero          |
-| Medium   | S3 versioning untuk rollback MDX | Sudah diaktifkan di Terraform, tinggal pakai        |
-| Low      | OpenSearch / full-text search    | Search MDX content lebih powerful dari string match |
-| Low      | AWS X-Ray                        | Distributed tracing per request                     |
-| Low      | Cognito                          | Jika ingin multi-user publik (saat ini admin only)  |
+| Priority | Feature                          | Notes                                                |
+| -------- | -------------------------------- | ---------------------------------------------------- |
+| High     | Playwright E2E in CI             | Run after staging deploy                              |
+| Medium   | App Runner instead of ALB+ECS   | Often cheaper for portfolios; scale to zero          |
+| Medium   | S3 versioning for MDX rollback  | Enable in Terraform; use object versions             |
+| Low      | OpenSearch / full-text search   | Stronger than linear string scan for content search  |
+| Low      | AWS X-Ray                        | Distributed tracing per request                       |
+| Low      | Cognito                          | If you need public multi-user auth (today: admin-focused) |
 
 ---
 
@@ -905,7 +905,7 @@ terraform apply -target=aws_ecs_service.app -var-file="terraform.tfvars"
 # Prerequisites
 node --version    # >= 20.x
 terraform --version  # >= 1.6.0
-aws --version     # >= 2.x (untuk sync S3 saat dev dengan DOCS_STORAGE=s3)
+aws --version     # >= 2.x (useful for S3 sync in dev with DOCS_STORAGE=s3)
 
 # 1. Clone repo
 git clone https://github.com/YOUR_USERNAME/cys-fumadocs
@@ -916,18 +916,18 @@ npm install
 
 # 3. Setup env
 cp .env.example .env.local
-# Edit .env.local — isi DATABASE_URL, NEXTAUTH_SECRET, dll.
+# Edit .env.local — set DATABASE_URL, NEXTAUTH_SECRET, etc.
 
-# 4. Setup database lokal
+# 4. Local database
 docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=wiki -e POSTGRES_USER=wiki -e POSTGRES_DB=wiki postgres:16
 npm run db:migrate
 npm run db:seed
 
-# 5. Jalankan dev server
+# 5. Dev server
 npm run dev
 ```
 
-### Environment Variables Lengkap
+### Full environment variable list
 
 ```bash
 # === Database ===
@@ -938,9 +938,9 @@ NEXTAUTH_SECRET=your-secret-here
 NEXTAUTH_URL=http://localhost:3000
 
 # === Docs Storage ===
-# Lokal: tidak perlu diisi (default fs)
+# Local dev: leave unset (defaults to fs)
 # DOCS_STORAGE=s3
-# DOCS_S3_BUCKET=nama-bucket
+# DOCS_S3_BUCKET=your-bucket-name
 # DOCS_S3_PREFIX=
 # AWS_REGION=ap-southeast-1
 
@@ -964,48 +964,48 @@ TIMEZONE=Asia/Jakarta
 
 ### ECS Task Restart Loop
 
-**Symptom**: Task terus restart, health check gagal.  
-**Fix**:
+**Symptom:** Task keeps restarting; health checks fail.  
+**Fix:**
 
 ```bash
-# Cek log task
+# Read task logs
 aws logs get-log-events \
   --log-group-name "/ecs/any-documentation-dev" \
   --log-stream-name "ecs/app/TASK_ID" \
   --limit 50
 
-# Cek env yang hilang (mis. DATABASE_URL tidak di-inject)
+# Check for missing env (e.g. DATABASE_URL not injected)
 aws ecs describe-task-definition --task-definition any-documentation-dev \
   | jq '.taskDefinition.containerDefinitions[].environment'
 ```
 
 ### RDS Connection Refused
 
-**Symptom**: `Can't reach database server`.  
-**Cause**: Security group tidak allow dari ECS security group, atau DATABASE_URL salah.  
-**Fix**: Pastikan inbound RDS SG mengizinkan port 5432 dari SG ECS task.
+**Symptom:** `Can't reach database server`.  
+**Cause:** RDS security group does not allow the ECS task SG, or `DATABASE_URL` is wrong.  
+**Fix:** Allow inbound TCP **5432** on RDS from the ECS task security group.
 
 ### Gemini API Error 429
 
-**Symptom**: `429 Too Many Requests` dari Gemini.  
-**Fix**:
+**Symptom:** `429 Too Many Requests` from Gemini.  
+**Fix:**
 
 ```bash
-# Ganti ke model yang lebih hemat quota
+# Switch to a more quota-friendly model
 GEMINI_AI_MODEL=gemini-1.5-flash-8b
 
 # Monitor: https://aistudio.google.com/app/apikey
 ```
 
-### Konten MDX Tidak Update Setelah Simpan
+### MDX content not updating after save
 
-**Symptom**: Simpan via editor tapi halaman `/docs/...` masih lama.  
-**Cause**: Revalidasi gagal, atau akses S3 gagal (IAM).  
-**Fix**:
+**Symptom:** Saved via editor but `/docs/...` still shows stale content.  
+**Cause:** Revalidation failed, or S3 access failed (IAM).  
+**Fix:**
 
 ```bash
-# Cek log ECS: apakah save-file return 200?
-# Cek IAM task role: apakah ada s3:PutObject?
+# ECS logs: does save-file return 200?
+# IAM task role: does it include s3:PutObject?
 aws iam simulate-principal-policy \
   --policy-source-arn TASK_ROLE_ARN \
   --action-names s3:PutObject \
@@ -1014,8 +1014,8 @@ aws iam simulate-principal-policy \
 
 ### Terraform State Conflict
 
-**Symptom**: `Error: state is locked`.  
-**Fix**:
+**Symptom:** `Error: state is locked`.  
+**Fix:**
 
 ```bash
 terraform force-unlock <LOCK_ID>
@@ -1027,40 +1027,42 @@ terraform force-unlock <LOCK_ID>
 
 ### ADR-001: Monolith Container vs Serverless Lambda
 
-**Keputusan**: Monolith Next.js standalone di ECS Fargate  
-**Alasan**: Aplikasi membutuhkan SSR dinamis (MDX live, NextAuth session, Prisma), satu unit deploy lebih mudah di-debug. Aplikasi ini bukan static site + API terpisah.  
-**Tradeoff diterima**: Tidak ada free tier untuk ECS Fargate (biaya minimal ~$20/bulan); Lambda lebih murah tapi membutuhkan arsitektur terpisah yang tidak sesuai dengan Next.js App Router yang ada.
+**Decision:** Monolithic Next.js standalone on ECS Fargate  
+**Reason:** The app needs dynamic SSR (live MDX, NextAuth, Prisma); one deploy unit is easier to operate. This is not a static site + separate API split.  
+**Trade-off accepted:** No Fargate free tier (~minimal monthly cost); Lambda can be cheaper but forces a different architecture than this App Router app.
 
 ### ADR-002: RDS PostgreSQL vs DynamoDB
 
-**Keputusan**: RDS PostgreSQL (via Prisma)  
-**Alasan**: Data sudah relasional (User, LoginLog, FileLog); Prisma sudah terintegrasi; migrasi schema mudah; free tier db.t3.micro 12 bulan pertama.  
-**Tradeoff diterima**: Perlu connection pooling (PgBouncer/RDS Proxy) jika scale banyak instance; untuk portfolio cukup dengan connection limit Prisma.
+**Decision:** RDS PostgreSQL (via Prisma)  
+**Reason:** Data is relational (User, LoginLog, FileLog); Prisma is already integrated; schema migrations are straightforward; RDS free tier can cover early dev.  
+**Trade-off accepted:** Add pooling (PgBouncer / RDS Proxy) if you scale out tasks; for a portfolio, Prisma limits often suffice.
 
-### ADR-003: S3 untuk MDX vs EFS
+### ADR-003: S3 for MDX vs EFS
 
-**Keputusan**: S3 (via abstraksi `DocsStorage`)  
-**Alasan**: Lebih murah, lebih cloud-native, versioning built-in, tidak butuh NFS mount. Abstraksi memudahkan swap ke `fs` saat lokal.  
-**Tradeoff diterima**: Folder kosong butuh marker `.keep`; tidak ada `rename` atomik di S3 (copy + delete).
+**Decision:** S3 (via `DocsStorage` abstraction)  
+**Reason:** Cost-effective, cloud-native, optional versioning, no NFS mount. The abstraction keeps local `fs` dev simple.  
+**Trade-off accepted:** Empty folders need `.keep` markers; S3 has no atomic rename (copy + delete).
 
 ### ADR-004: DocsStorage Abstraction
 
-**Keputusan**: Interface terpusat dengan adapter `fs` dan `s3`  
-**Alasan**: Satu perubahan env mengubah seluruh behavior storage tanpa mengubah kode bisnis. Developer lokal tetap pakai `fs`, prod pakai `s3`.  
-**Tradeoff diterima**: Sedikit lebih verbose dari akses `fs` langsung; adapter S3 butuh `@aws-sdk/client-s3`.
+**Decision:** Central interface with `fs` and `s3` adapters  
+**Reason:** Flip storage behavior with env only; local dev stays on `fs`, production on `s3`.  
+**Trade-off accepted:** Slightly more code than raw `fs`; S3 path needs `@aws-sdk/client-s3`.
 
 ### ADR-005: MDX Content Live vs Baked at Build
 
-**Keputusan**: `force-dynamic` + baca dari storage per-request  
-**Alasan**: Konten MDX bisa berubah lewat editor setelah image di-build; SSG tidak cocok.  
-**Tradeoff diterima**: Setiap request ke `/docs` memerlukan S3 `GetObject` / `ListObjectsV2`; untuk situs dokumentasi kecil ini acceptable. `React.cache` meminimalkan duplikasi per-request.
+**Decision:** `force-dynamic` + read from storage per request  
+**Reason:** MDX can change via the editor after the image is built; full SSG is a poor fit.  
+**Trade-off accepted:** Each `/docs` request may hit S3 (`GetObject` / `ListObjectsV2`); acceptable for small doc sites. `React.cache` limits duplicate work per request.
 
 ### ADR-006: Terraform vs CDK
 
-**Keputusan**: Terraform  
-**Alasan**: Multi-cloud portable, industry standard di DevOps job market, komunitas mature.  
-**Tradeoff diterima**: Lebih verbose dibanding CDK untuk resource container.
+**Decision:** Terraform  
+**Reason:** Portable across clouds, common in DevOps hiring, mature ecosystem.  
+**Trade-off accepted:** More verbose than CDK for some container resources.
 
 ---
 
-_Dokumen ini adalah living document — update setiap kali ada perubahan arsitektur atau keputusan teknis baru._
+_This is a living document — update it whenever architecture or major technical decisions change._
+
+> **Language:** Keep this document in **English** for consistency with the rest of the repo docs.

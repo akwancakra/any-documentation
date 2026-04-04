@@ -1,38 +1,38 @@
 # Admin & user roles
 
-Akses **admin** (editor dokumen, upload, dashboard penuh, login logs) vs **user** (akses terbatas sesuai middleware) ditentukan oleh **kolom `role`** pada tabel `users` di PostgreSQL.
+**Admin** access (document editor, uploads, full dashboard, login logs) vs **user** (limited per middleware) is determined by the **`role`** column on the `users` table in PostgreSQL.
 
-## Nilai yang didukung
+## Supported values
 
-- `admin` — akses penuh termasuk `/editor`, `/api/save-file`, dll.
-- `user` — pengguna biasa (sesuai aturan di `middleware.ts`)
+- `admin` — full access including `/editor`, `/api/save-file`, etc.
+- `user` — regular user (per rules in `middleware.ts`)
 
-## Cara mengubah role
+## Changing a role
 
-### Prisma Studio (paling mudah)
+### Prisma Studio (easiest)
 
 ```bash
 npm run db:studio
 ```
 
-Buka model **User**, edit field `role` untuk email yang diinginkan.
+Open the **User** model and edit `role` for the target email.
 
 ### SQL
 
 ```sql
-UPDATE users SET role = 'admin' WHERE email = 'orang@example.com';
+UPDATE users SET role = 'admin' WHERE email = 'person@example.com';
 ```
 
-### User baru
+### New users
 
-1. Studio: **Add record** — isi `email`, `passwordHash` harus berupa **bcrypt** (jangan simpan password plaintext).
-2. Atau buat skrip kecil dengan `bcrypt.hash` + `prisma.user.create` (bisa ditambahkan sebagai `npm run db:add-user` jika diperlukan).
+1. In Studio: **Add record** — `email` is required; `passwordHash` must be a **bcrypt** hash (never store plaintext passwords).
+2. Or add a small script using `bcrypt.hash` + `prisma.user.create` (optional `npm run db:add-user`).
 
-## Seed awal
+## Initial seed
 
-`npm run db:seed` membuat/ memperbarui satu user admin (email/password dari env `SEED_*`). Ganti password production segera setelah deploy pertama.
+`npm run db:seed` creates or updates one admin user (email/password from `SEED_*` env vars). Change the production password immediately after first deploy.
 
-## Catatan keamanan
+## Security notes
 
-- Password hanya disimpan sebagai **hash bcrypt** di `password_hash`.
-- Session memakai **JWT** NextAuth; pastikan `NEXTAUTH_SECRET` kuat dan unik per environment.
+- Passwords are stored only as **bcrypt hashes** in `password_hash`.
+- Sessions use NextAuth **JWT**; use a strong, unique `NEXTAUTH_SECRET` per environment.

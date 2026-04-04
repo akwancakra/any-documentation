@@ -1,17 +1,13 @@
-# Sistem Login Logging
+# Login logging
 
-Sistem login logging telah berhasil diimplementasikan untuk mencatat aktivitas login pengguna dengan detail informasi device, IP address, user agent, dan metadata lainnya.
+Sign-in attempts (success and failure) can be recorded in **PostgreSQL** via the `login_logs` table (Prisma). Each row stores user identifiers, provider, success flag, session id, and **request metadata** (IP, user agent, coarse device/browser/OS).
 
-## Fitur Utama
+## How events are written
 
-### 1. Logging Otomatis
+1. **Primary path:** During NextAuth `authorize`, the app inserts a row with `prisma.loginLog.create` (see `src/lib/auth-options.ts`).
+2. **Alternative path:** `POST /api/login-log` accepts a JSON payload and persists to the same table when the request includes a valid `X-Internal-Token` matching `LOGIN_LOG_INTERNAL_SECRET` or `NEXTAUTH_SECRET` (see `src/app/api/login-log/route.ts`). Useful for trusted internal callers; normal flows use direct DB insert.
 
-- **Login Berhasil**: Setiap login yang berhasil dicatat dengan detail lengkap
-- **Login Gagal**: Percobaan login yang gagal juga dicatat untuk keamanan
-- **Provider Tracking**: Mendukung logging untuk Credentials dan Azure AD
-- **Real-time**: Log disimpan secara real-time saat event terjadi
-
-### 2. Data yang Dicatat
+## Payload shape (conceptual)
 
 ```typescript
 interface LoginLogData {
@@ -23,253 +19,57 @@ interface LoginLogData {
     name?: string;
     role?: string;
   };
-  provider: "credentials" | "azure-ad";
+  provider: string; // e.g. "credentials", "error"
   requestInfo: {
-    ip: string; // IP address pengguna
-    userAgent: string; // Full user agent string
-    browser: string; // Browser yang digunakan
-    os: string; // Operating system
-    device: string; // Desktop/Mobile/Tablet
+    ip: string;
+    userAgent: string;
+    browser: string;
+    os: string;
+    device: string;
     isMobile: boolean;
     isTablet: boolean;
     isDesktop: boolean;
-    timestamp: string; // ISO timestamp
-    headers: {
-      // Additional request headers
-      forwarded?: string;
-      realIp?: string;
-      host?: string;
-      referer?: string;
+    timestamp: string;
+    headers?: {
+      forwarded?: string | null;
+      realIp?: string | null;
+      host?: string | null;
+      referer?: string | null;
     };
   };
-  sessionId: string; // Unique session identifier
+  sessionId: string;
 }
 ```
 
-### 3. API Endpoints
+## API — `POST /api/login-log`
 
-#### POST `/api/login-log`
+- **Auth:** `X-Internal-Token` must match the configured secret.
+- **Body:** JSON matching `LoginLogData` (see types in `src/lib/login-log-types.ts`).
+- **Response:** `201` on success.
 
-Menyimpan log login baru (digunakan secara internal oleh sistem auth).
+## API — `GET /api/login-log`
 
-#### GET `/api/login-log`
+- **Auth:** signed-in **admin** only.
+- **Query:** `page`, `limit` (max 5000), optional `success`, `provider`, `startDate`, `endDate`.
+- **Response:** `{ logs, pagination, filters }`.
 
-Mengambil data login logs dengan filter dan pagination.
+## API — `DELETE /api/login-log?days=N`
 
-**Query Parameters:**
+- **Auth:** admin only.
+- Deletes rows older than **N** days (default `30`).
 
-- `page`: Nomor halaman (default: 1)
-- `limit`: Jumlah item per halaman (default: 50)
-- `success`: Filter status login (true/false)
-- `provider`: Filter provider (credentials/azure-ad)
-- `startDate`: Filter tanggal mulai (ISO format)
-- `endDate`: Filter tanggal akhir (ISO format)
+## Admin UI
 
-**Response:**
+`/dashboard/login-logs` uses hooks such as `useLoginLogs` / `useLoginLogStats` (see `src/hooks/use-login-logs.ts`) which call the GET API.
 
-```json
-{
-  "logs": [
-    /* array of LoginLogData */
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 50,
-    "total": 150,
-    "totalPages": 3
-  },
-  "filters": {
-    "success": "true",
-    "provider": null,
-    "startDate": null,
-    "endDate": null
-  }
-}
-```
+## Security & privacy
 
-#### DELETE `/api/login-log`
-
-Membersihkan log lama (perlu akses admin).
-
-**Query Parameters:**
-
-- `days`: Hapus log lebih lama dari X hari (default: 30)
-
-### 4. Dashboard Admin
-
-Akses halaman login logs melalui: `/dashboard/login-logs`
-
-**Fitur Dashboard:**
-
-- ✅ Real-time statistics (total login, success rate, dll)
-- ✅ Filter berdasarkan status, provider, dan tanggal
-- ✅ Pagination untuk navigasi data besar
-- ✅ Detail device info dengan icon
-- ✅ User agent inspection
-- ✅ Responsive design
-
-## Contoh Penggunaan
-
-### 1. Menggunakan Custom Hook
-
-```typescript
-import { useLoginLogs, useLoginLogStats } from "@/hooks/use-login-logs";
-
-function MyComponent() {
-  const { logs, loading, error, updateFilters, pagination } = useLoginLogs();
-
-  const { stats } = useLoginLogStats();
-
-  // Filter hanya login gagal
-  const showFailedLogins = () => {
-    updateFilters({ success: false });
-  };
-
-  // Filter berdasarkan tanggal
-  const showLastWeek = () => {
-    const lastWeek = new Date();
-    lastWeek.setDate(lastWeek.getDate() - 7);
-    updateFilters({
-      startDate: lastWeek.toISOString().split("T")[0],
-    });
-  };
-
-  return (
-    <div>
-      {stats && (
-        <div>
-          <p>Total Login: {stats.totalLogins}</p>
-          <p>Success Rate: {stats.successRate.toFixed(1)}%</p>
-        </div>
-      )}
-
-      <button onClick={showFailedLogins}>Show Failed Logins</button>
-
-      {logs.map((log) => (
-        <div key={log.sessionId}>
-          <p>
-            {log.user.email} - {log.success ? "Success" : "Failed"}
-          </p>
-          <p>IP: {log.requestInfo.ip}</p>
-          <p>Device: {log.requestInfo.device}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-```
-
-### 2. Mengakses API Secara Manual
-
-```javascript
-// Ambil login logs dengan filter
-const response = await fetch("/api/login-log?success=false&limit=10");
-const data = await response.json();
-
-console.log("Failed logins:", data.logs);
-
-// Hapus log lama (admin only)
-const cleanup = await fetch("/api/login-log?days=60", {
-  method: "DELETE",
-});
-```
-
-## Keamanan
-
-### Akses Control
-
-- **Dashboard**: Hanya admin yang bisa mengakses halaman login logs
-- **API**: Endpoint GET dan DELETE memerlukan autentikasi admin
-- **Data**: Informasi sensitif seperti password tidak disimpan
-
-### Privacy
-
-- User agent strings disimpan untuk analisis tetapi bisa di-anonymize jika diperlukan
-- IP addresses dicatat untuk keamanan tetapi bisa di-hash di production
-- Data dapat dibersihkan secara otomatis setelah periode tertentu
-
-## Deployment Notes
-
-### Environment Variables
-
-Pastikan `NEXTAUTH_URL` sudah di-set untuk production:
-
-```env
-NEXTAUTH_URL=https://yourdomain.com
-```
-
-### Database Integration (Optional)
-
-Saat ini menggunakan in-memory storage. Untuk production, integrate dengan database:
-
-```typescript
-// Contoh implementasi dengan database
-async function saveLoginLog(logData: LoginLogData) {
-  await db.loginLogs.create({
-    data: logData,
-  });
-}
-```
-
-### Log Rotation
-
-Implementasi auto-cleanup log lama:
-
-```typescript
-// Cron job untuk cleanup otomatis
-setInterval(async () => {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  await fetch("/api/login-log?days=30", { method: "DELETE" });
-}, 24 * 60 * 60 * 1000); // Daily cleanup
-```
-
-## Testing
-
-### Manual Testing
-
-1. Login dengan credentials yang benar → Cek log success
-2. Login dengan credentials salah → Cek log failed
-3. Login dari device berbeda → Cek detection device/browser
-4. Akses `/dashboard/login-logs` sebagai admin
-5. Test filter dan pagination
-
-### Development Credentials
-
-```
-Admin: admin@cybersecurity.com / admin123
-User: user@cybersecurity.com / user123
-```
+- Passwords are **never** stored in login logs.
+- Restrict admin routes and secrets in production (`NEXTAUTH_URL`, strong `NEXTAUTH_SECRET`).
+- Consider retention policies and `DELETE` cleanup for compliance.
 
 ## Troubleshooting
 
-### Log Tidak Muncul
-
-- Periksa console browser untuk error
-- Pastikan user memiliki role admin
-- Periksa network tab untuk request API
-
-### API Error 401/403
-
-- User tidak login atau bukan admin
-- Session expired, perlu login ulang
-
-### Missing Device Info
-
-- Request headers tidak tersedia (proxy/load balancer)
-- User agent tidak standard
-
-## Future Improvements
-
-1. **Database Integration**: Replace in-memory storage
-2. **Real-time Notifications**: Alert untuk suspicious activities
-3. **Geolocation**: Tambah info lokasi berdasarkan IP
-4. **Export Features**: Download logs dalam format CSV/JSON
-5. **Advanced Analytics**: Grafik trend login, heatmap, dll
-6. **Rate Limiting**: Deteksi brute force attempts
-7. **SIEM Integration**: Export ke security tools eksternal
-
----
-
-Sistem login logging ini memberikan visibility yang baik untuk monitoring keamanan dan troubleshooting. Data yang dikumpulkan dapat membantu dalam analisis forensik dan deteksi aktivitas mencurigakan.
+- **No rows** — confirm `DATABASE_URL` and migrations; check server logs during login.
+- **401 on POST** — token header mismatch or secret not set.
+- **403 on GET** — session user is not `admin`.

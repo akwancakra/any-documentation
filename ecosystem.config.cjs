@@ -1,15 +1,15 @@
 /**
  * PM2 ecosystem — Next.js production server (`next start`)
  *
- * Prasyarat: `npm run build` sebelum start production.
+ * Prerequisite: run `npm run build` before production start.
  *
- * Contoh:
+ * Examples:
  *   npm run build && npm run pm2:start
  *   npm run pm2:logs
  *   npm run pm2:reload
  *
- * Port & env: salin dari `.env` / shell (NEXTAUTH_URL, DATABASE_URL, dll).
- * PORT default 3000; override: `PORT=8080 npm run pm2:start`
+ * Port & env: load from `.env` / shell (NEXTAUTH_URL, DATABASE_URL, etc.).
+ * Default PORT 3000; override e.g. `PORT=8080 npm run pm2:start`
  */
 const path = require("path");
 

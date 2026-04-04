@@ -1,49 +1,49 @@
-# Menyimpan `content/docs` di Amazon S3
+# Storing `content/docs` in Amazon S3
 
-Aplikasi membaca dan menulis file MDX lewat abstraksi **DocsStorage**. Secara default (`DOCS_STORAGE` tidak di-set atau `fs`) data tetap di folder lokal `content/docs`. Untuk produksi di AWS dengan beberapa instance container, set **`DOCS_STORAGE=s3`**.
+The app reads and writes MDX through a **`DocsStorage`** abstraction. By default (`DOCS_STORAGE` unset or `fs`) content lives under the local `content/docs` folder. For multi-instance deployments on AWS, set **`DOCS_STORAGE=s3`**.
 
-## Variabel lingkungan
+## Environment variables
 
-| Variabel | Wajib | Keterangan |
-|----------|--------|------------|
-| `DOCS_STORAGE` | Tidak | `fs` (default) atau `s3` |
-| `DOCS_S3_BUCKET` | Ya jika `s3` | Nama bucket |
-| `DOCS_S3_PREFIX` | Tidak | Awalan key, mis. `wiki-docs/` |
-| `AWS_REGION` | Disarankan | Mis. `ap-southeast-1` |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DOCS_STORAGE` | No | `fs` (default) or `s3` |
+| `DOCS_S3_BUCKET` | Yes if `s3` | Bucket name |
+| `DOCS_S3_PREFIX` | No | Key prefix, e.g. `wiki-docs/` |
+| `AWS_REGION` | Recommended | e.g. `ap-southeast-1` |
 
-Kredensial: gunakan **IAM task role** (ECS) atau credential chain lokal untuk development.
+Credentials: use an **IAM task role** (ECS) or the default credential chain locally.
 
-## IAM (contoh)
+## IAM (example)
 
-Lampirkan policy ke role task/container yang menjalankan Next.js:
+Attach a policy to the role that runs Next.js, allowing:
 
-- `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:ListBucket` pada resource:
+- `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:ListBucket` on:
 
-  - `arn:aws:s3:::NAMA_BUCKET`
-  - `arn:aws:s3:::NAMA_BUCKET/PREFIX*`
+  - `arn:aws:s3:::BUCKET_NAME`
+  - `arn:aws:s3:::BUCKET_NAME/PREFIX*`
 
-Ganti `PREFIX` sesuai `DOCS_S3_PREFIX` (tanpa wildcard ganda jika prefix kosong: gunakan `arn:aws:s3:::NAMA_BUCKET/*`).
+If `DOCS_S3_PREFIX` is empty, use `arn:aws:s3:::BUCKET_NAME/*` instead of a prefix wildcard.
 
-## Isi awal bucket
+## Initial bucket content
 
-Dari root repo (dengan AWS CLI):
+From the repo root (with AWS CLI):
 
 ```bash
-export DOCS_S3_BUCKET=nama-bucket-anda
-export DOCS_S3_PREFIX=   # atau mis. wiki-docs/
+export DOCS_S3_BUCKET=your-bucket-name
+export DOCS_S3_PREFIX=   # or e.g. wiki-docs/
 ./scripts/sync-content-docs-to-s3.sh
 ```
 
-Atau setara:
+Or:
 
 ```bash
-aws s3 sync ./content/docs s3://NAMA_BUCKET/PREFIX --delete
+aws s3 sync ./content/docs s3://BUCKET_NAME/PREFIX --delete
 ```
 
-## Folder kosong di S3
+## Empty folders in S3
 
-S3 tidak punya direktori kosong. Membuat folder dari UI menulis object penanda `nama-folder/.keep`. Itu kompatibel dengan pohon file di editor.
+S3 has no real directories. Creating a folder from the UI writes a **marker object** `folder/.keep`, which the file tree understands.
 
-## Konten “live”
+## Live content
 
-Halaman `/docs` memakai `dynamic = "force-dynamic"` dan membaca storage pada setiap request; perubahan lewat API disertai `revalidatePath` / `revalidateTag` sehingga tidak perlu rebuild image untuk melihat MDX baru.
+`/docs` is configured for dynamic rendering and reads from storage on request; updates via the API trigger `revalidatePath` / `revalidateTag` so you usually do **not** need a new image build for every MDX change.
