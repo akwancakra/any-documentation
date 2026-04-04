@@ -1,13 +1,38 @@
 import { cache } from "react";
-import { getAllMDXFiles, getMDXFileBySlug } from "./mdx-utils";
+import { getAllMDXFiles, getMDXFileBySlug, type MDXFrontmatter } from "./mdx-utils";
+
+export interface TocEntry {
+  title: string;
+  url: string;
+  depth: number;
+}
+
+interface PageNode {
+  type: "page";
+  name: string;
+  url: string;
+}
+
+interface FolderNode {
+  type: "folder";
+  name: string;
+  children: PageNode[];
+}
+
+type TreeNode = PageNode | FolderNode;
+
+interface PageTree {
+  name: string;
+  children: TreeNode[];
+}
 
 export interface DynamicPage {
   data: {
     title: string;
     description: string;
     content: string;
-    frontmatter: any;
-    toc: any[];
+    frontmatter: MDXFrontmatter;
+    toc: TocEntry[];
     full?: boolean;
     lastModified: string;
   };
@@ -18,14 +43,12 @@ export interface DynamicPage {
 export const getDynamicPage = cache(
   async (slugs?: string[]): Promise<DynamicPage | null> => {
     try {
-      // Use MDX utils for consistent handling
       const mdxFile = await getMDXFileBySlug(slugs || []);
 
       if (!mdxFile) {
         return null;
       }
 
-      // Convert to DynamicPage format
       const dynamicPage: DynamicPage = {
         data: {
           title: mdxFile.data.title,
@@ -48,13 +71,10 @@ export const getDynamicPage = cache(
   }
 );
 
-// Get all dynamic pages for navigation
 export const getAllDynamicPages = cache(async (): Promise<DynamicPage[]> => {
   try {
-    // Use MDX utils for consistent slug handling with sanitization
     const mdxFiles = await getAllMDXFiles();
 
-    // Convert MDXFile to DynamicPage format
     const pages: DynamicPage[] = mdxFiles.map((file) => ({
       data: {
         title: file.data.title,
@@ -76,37 +96,31 @@ export const getAllDynamicPages = cache(async (): Promise<DynamicPage[]> => {
   }
 });
 
-// Generate navigation tree
-export const generatePageTree = cache(async () => {
+export const generatePageTree = cache(async (): Promise<PageTree> => {
   const allPages = await getAllDynamicPages();
 
-  // Simple tree structure for sidebar
-  const tree: any = {
+  const tree: PageTree = {
     name: "Documentation",
     children: [],
   };
 
-  // Separate root pages from folder pages
-  const rootPages: any[] = [];
-  const folderGroups: Record<string, any[]> = {};
+  const rootPages: PageNode[] = [];
+  const folderGroups: Record<string, PageNode[]> = {};
 
   for (const page of allPages) {
     if (page.slugs.length === 0) {
-      // Root index page
       tree.children.unshift({
         type: "page",
         name: page.data.title,
         url: page.url,
       });
     } else if (page.slugs.length === 1) {
-      // Root level pages (not in any folder)
       rootPages.push({
         type: "page",
         name: page.data.title,
         url: page.url,
       });
     } else {
-      // Pages inside folders (slugs.length > 1)
       const firstSegment = page.slugs[0];
       if (!folderGroups[firstSegment]) {
         folderGroups[firstSegment] = [];
@@ -119,10 +133,8 @@ export const generatePageTree = cache(async () => {
     }
   }
 
-  // Add root pages directly to tree
   tree.children.push(...rootPages);
 
-  // Add folder groups to tree
   for (const [groupName, groupPages] of Object.entries(folderGroups)) {
     tree.children.push({
       type: "folder",
@@ -134,9 +146,8 @@ export const generatePageTree = cache(async () => {
   return tree;
 });
 
-// Simple TOC extraction
-function extractTOC(content: string): any[] {
-  const toc: any[] = [];
+function extractTOC(content: string): TocEntry[] {
+  const toc: TocEntry[] = [];
   const lines = content.split("\n");
 
   for (const line of lines) {
@@ -162,6 +173,3 @@ function extractTOC(content: string): any[] {
 
   return toc;
 }
-
-// Cache is now handled by React cache and MDX utils
-// No manual cache clearing needed

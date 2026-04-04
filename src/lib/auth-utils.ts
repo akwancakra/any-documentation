@@ -2,6 +2,14 @@ import { Session } from "next-auth";
 
 export type UserRole = "admin" | "user";
 
+type Permission =
+  | "read_docs"
+  | "write_docs"
+  | "delete_docs"
+  | "manage_users"
+  | "access_admin_panel"
+  | "view_analytics";
+
 export interface AuthUser {
   id?: string;
   name?: string | null;
@@ -10,66 +18,43 @@ export interface AuthUser {
   role?: UserRole;
 }
 
-/**
- * Get user role from session
- */
 export function getUserRole(session: Session | null): UserRole {
-  return ((session?.user as any)?.role as UserRole) || "user";
+  return session?.user?.role ?? "user";
 }
 
-/**
- * Check if user is admin
- */
 export function isAdmin(session: Session | null): boolean {
   return getUserRole(session) === "admin";
 }
 
-/**
- * Check if user has permission to access admin routes
- */
 export function hasAdminAccess(session: Session | null): boolean {
   return isAdmin(session);
 }
 
-/**
- * Check if user can access specific route based on role
- */
 export function canAccessRoute(session: Session | null, path: string): boolean {
   const role = getUserRole(session);
-  
-  // Public routes
+
   const publicRoutes = ["/", "/login", "/api/auth"];
-  if (publicRoutes.some(route => path.startsWith(route))) {
+  if (publicRoutes.some((route) => path.startsWith(route))) {
     return true;
   }
 
-  // Admin only routes
   const adminRoutes = ["/admin", "/docs/editor"];
-  if (adminRoutes.some(route => path.startsWith(route))) {
+  if (adminRoutes.some((route) => path.startsWith(route))) {
     return role === "admin";
   }
 
-  // User routes (accessible by both user and admin)
   const userRoutes = ["/docs", "/dashboard"];
-  if (userRoutes.some(route => path.startsWith(route))) {
+  if (userRoutes.some((route) => path.startsWith(route))) {
     return ["user", "admin"].includes(role);
   }
 
-  // Default: require authentication
   return !!session;
 }
 
-/**
- * Get default redirect path based on user role
- */
-export function getDefaultRedirectPath(session: Session | null): string {
-  // Semua user (admin dan user) akan diarahkan ke dashboard
+export function getDefaultRedirectPath(_session: Session | null): string {
   return "/dashboard";
 }
 
-/**
- * Role definitions with permissions
- */
 export const ROLES = {
   admin: {
     name: "Administrator",
@@ -79,26 +64,21 @@ export const ROLES = {
       "delete_docs",
       "manage_users",
       "access_admin_panel",
-      "view_analytics"
-    ],
-    routes: ["/docs", "/docs/editor", "/admin", "/dashboard"]
+      "view_analytics",
+    ] as Permission[],
+    routes: ["/docs", "/docs/editor", "/admin", "/dashboard"],
   },
   user: {
     name: "User",
-    permissions: [
-      "read_docs"
-    ],
-    routes: ["/docs", "/dashboard"]
-  }
+    permissions: ["read_docs"] as Permission[],
+    routes: ["/docs", "/dashboard"],
+  },
 } as const;
 
-/**
- * Check if user has specific permission
- */
 export function hasPermission(
-  session: Session | null, 
+  session: Session | null,
   permission: string
 ): boolean {
   const role = getUserRole(session);
-  return ROLES[role]?.permissions.includes(permission as any) || false;
-} 
+  return (ROLES[role]?.permissions as readonly string[]).includes(permission);
+}

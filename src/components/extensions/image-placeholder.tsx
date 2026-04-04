@@ -8,11 +8,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import {
   NODE_HANDLES_SELECTED_STYLE_CLASSNAME,
-  cn,
   isValidUrl,
-} from "@/lib/utils";
+} from "@/lib/tiptap-utils";
 import {
   type CommandProps,
   type Editor,

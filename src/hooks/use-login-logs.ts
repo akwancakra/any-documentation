@@ -22,8 +22,7 @@ export function useLoginLogs(initialFilters: LoginLogFilters = {}) {
     totalPages: 0,
   });
 
-  // Check if user has admin access
-  const hasAdminAccess = session?.user && (session.user as any).role === 'admin';
+  const hasAdminAccess = session?.user?.role === "admin";
 
   const fetchLogs = useCallback(async (newFilters?: LoginLogFilters) => {
     if (!hasAdminAccess) {
@@ -120,7 +119,7 @@ export function useLoginLogStats() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const hasAdminAccess = session?.user && (session.user as any).role === 'admin';
+  const hasAdminAccess = session?.user?.role === "admin";
 
   const fetchStats = useCallback(async () => {
     if (!hasAdminAccess) {

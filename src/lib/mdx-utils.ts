@@ -2,17 +2,25 @@ import matter from "gray-matter";
 import { getDocsStorage } from "@/lib/docs-storage";
 import { isFolderKeepKey } from "@/lib/docs-storage/keys";
 
+export interface MDXFrontmatter {
+  title: string;
+  description: string;
+  full?: boolean;
+  [key: string]: unknown;
+}
+
 export interface MDXFile {
   slug: string[];
   filePath: string;
   url: string;
-  data: {
-    title: string;
-    description: string;
-    [key: string]: any;
-  };
+  data: MDXFrontmatter;
   content: string;
   lastModified: Date;
+}
+
+export interface StructuredData {
+  headings: { id: string; text: string; level: number }[];
+  sections: { id: string; text: string; level: number }[];
 }
 
 export interface SearchableContent {
@@ -22,7 +30,7 @@ export interface SearchableContent {
   content: string;
   url: string;
   slug: string[];
-  structuredData: any;
+  structuredData: StructuredData;
 }
 
 /**
@@ -135,26 +143,10 @@ export async function getAllMDXFiles(): Promise<MDXFile[]> {
  */
 export async function getLatestMDXFiles(limit: number = 4): Promise<MDXFile[]> {
   try {
-    console.log(`[MDX Utils] Getting latest ${limit} MDX files`);
     const allFiles = await getAllMDXFiles();
-
-    console.log(`[MDX Utils] Found ${allFiles.length} total files`);
-
-    const sortedFiles = allFiles
+    return allFiles
       .sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime())
       .slice(0, limit);
-
-    console.log(
-      `[MDX Utils] Returning ${sortedFiles.length} latest files:`,
-      sortedFiles.map((f) => ({
-        title: f.data.title,
-        slug: f.slug,
-        url: f.url,
-        lastModified: f.lastModified.toISOString(),
-      })),
-    );
-
-    return sortedFiles;
   } catch (error) {
     console.error("Error getting latest MDX files:", error);
     return [];
@@ -269,7 +261,7 @@ export async function searchMDXFiles(
   }
 }
 
-function extractStructuredData(content: string): any {
+function extractStructuredData(content: string): StructuredData {
   try {
     const headings: { id: string; text: string; level: number }[] = [];
     const headingRegex = /^(#{1,6})\s+(.+)$/gm;

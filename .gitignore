@@ -20,6 +20,9 @@
 /build
 *.tsbuildinfo
 
+# pm2
+/logs
+
 # misc
 .DS_Store
 *.pem

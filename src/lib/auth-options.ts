@@ -90,40 +90,24 @@ async function logUserLogin(
   provider: string,
   success: boolean = true
 ) {
-  const logData = {
-    event: "user_login",
-    success,
-    user: {
-      id: user?.id,
-      email: user?.email,
-      name: user?.name,
-      role: user?.role,
-    },
-    provider,
-    requestInfo,
-    sessionId: generateSessionId(),
-  };
-  console.log("=== USER LOGIN LOG ===");
-  console.log(JSON.stringify(logData, null, 2));
   try {
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const internalToken =
-      process.env.LOGIN_LOG_INTERNAL_SECRET || process.env.NEXTAUTH_SECRET || "";
-    const response = await fetch(`${baseUrl}/api/login-log`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(internalToken && { "X-Internal-Token": internalToken }),
+    await prisma.loginLog.create({
+      data: {
+        createdAt: new Date(),
+        event: "user_login",
+        success,
+        provider,
+        sessionId: generateSessionId(),
+        userId: user?.id,
+        userEmail: user?.email,
+        userName: user?.name,
+        userRole: user?.role,
+        requestInfo: requestInfo as object,
       },
-      body: JSON.stringify(logData),
     });
-    if (!response.ok) {
-      console.error("Failed to save login log:", await response.text());
-    }
   } catch (error) {
-    console.error("Error saving login log to API:", error);
+    console.warn("Failed to write login log:", error);
   }
-  return logData;
 }
 
 function generateSessionId() {

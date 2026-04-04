@@ -8,10 +8,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { getLatestMDXFiles } from "@/lib/mdx-utils";
 import { HeroGridBackdrop } from "@/components/shell/hero-grid-backdrop";
-import { HomeHero } from "./_components/home-hero";
+import { Navbar } from "@/components/shell/navbar";
 import { formatDateShort } from "@/lib/formatters";
+import { SearchDocsButton } from "./_components/search-docs-button";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +46,44 @@ export default async function HomePage() {
 
   return (
     <>
-      <HomeHero />
+      <section className="relative overflow-hidden bg-background pb-8 md:pb-12">
+        <div
+          className="absolute inset-0 pointer-events-none bg-[length:48px_48px]"
+          style={{
+            backgroundImage: "var(--hero-grid)",
+            WebkitMaskImage: "var(--hero-grid-mask)",
+            maskImage: "var(--hero-grid-mask)",
+          }}
+          aria-hidden
+        />
+
+        <div className="relative z-10">
+          <Navbar />
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center pt-8 text-center md:pt-14 ds-page-shell">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-secondary border border-border text-sm text-muted-foreground mb-8">
+            <span>Open source • Build your docs with MDX</span>
+          </div>
+
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-medium tracking-tight text-foreground max-w-4xl leading-[1.1]">
+            <span className="text-muted-foreground">Find</span> what you need
+          </h1>
+
+          <p className="mt-6 text-muted-foreground text-base md:text-lg max-w-2xl">
+            Search across all pages, then jump into the latest updates below.
+          </p>
+
+          <div className="mt-10 flex w-full max-w-3xl flex-col flex-wrap items-center justify-center gap-4 sm:flex-row">
+            <Button asChild size="lg" variant="pill" className="gap-2">
+              <Link href="/docs">
+                Get started <ArrowRight className="w-4 h-4" />
+              </Link>
+            </Button>
+            <SearchDocsButton />
+          </div>
+        </div>
+      </section>
 
       <section className="ds-section-canvas pt-6 md:pt-10">
         <HeroGridBackdrop variant="section" />

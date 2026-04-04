@@ -28,7 +28,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
-import { cn, duplicateContent } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { duplicateContent } from "@/lib/tiptap-utils";
 
 // Helper function to save uploaded images to the public folder
 async function saveImageToPublic(

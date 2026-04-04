@@ -13,7 +13,7 @@ import { revalidateDocsContent } from "@/lib/docs-revalidate";
 
 async function requireAdminSession() {
   const session = await getServerSession(authOptions);
-  if (!session || (session.user as { role?: string })?.role !== "admin") {
+  if (!session || session.user?.role !== "admin") {
     return null;
   }
   return session;
@@ -26,9 +26,7 @@ function toPosix(p: string): string {
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return new Response(JSON.stringify({ message: "Unauthorized" }), {
-      status: 401,
-    });
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
   try {
     const storage = getDocsStorage();
@@ -46,9 +44,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await requireAdminSession();
   if (!session) {
-    return new Response(JSON.stringify({ message: "Unauthorized" }), {
-      status: 401,
-    });
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
   try {
     const { folderPath } = await request.json();
@@ -94,9 +90,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const session = await requireAdminSession();
   if (!session) {
-    return new Response(JSON.stringify({ message: "Unauthorized" }), {
-      status: 401,
-    });
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
   try {
     const { itemPath } = await request.json();
@@ -155,9 +149,7 @@ export async function DELETE(request: Request) {
 export async function PUT(request: Request) {
   const session = await requireAdminSession();
   if (!session) {
-    return new Response(JSON.stringify({ message: "Unauthorized" }), {
-      status: 401,
-    });
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
   try {
     const body = await request.json();

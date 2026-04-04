@@ -9,9 +9,7 @@ import { authOptions } from "@/lib/auth-options";
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return new Response(JSON.stringify({ message: "Unauthorized" }), {
-      status: 401,
-    });
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
   try {
     const formData = await req.formData();

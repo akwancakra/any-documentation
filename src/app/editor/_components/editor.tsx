@@ -34,7 +34,7 @@ import { LinkToolbar } from "@/components/toolbars/link";
 import { TableToolbar } from "@/components/toolbars/table";
 import { CalloutToolbar } from "@/components/toolbars/callout";
 import { TaskListToolbar } from "@/components/toolbars/task-list";
-import { EditorContent, type Extension, useEditor } from "@tiptap/react";
+import { EditorContent, type Extension, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Type, Eye, Save, ChevronDown, ArrowLeft } from "lucide-react";
 import SearchAndReplace from "@/components/extensions/search-and-replace";
@@ -58,20 +58,8 @@ import { CalloutExtension } from "@/components/extensions/callout";
 import { TableOfContents } from "@/app/editor/_components/table-of-contents";
 import { useRouter } from "next/navigation";
 import { saveAs } from "file-saver";
-import { Node } from "@tiptap/core";
 import { ToastProvider, useToast } from "@/components/ui/use-toast";
 import { SaveDialog } from "@/app/editor/_components/save-dialog";
-
-// Fumadocs components for editor previews
-import { Accordion, Accordions } from "fumadocs-ui/components/accordion";
-import { Card, Cards } from "fumadocs-ui/components/card";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "fumadocs-ui/components/tabs";
-import { Callout } from "fumadocs-ui/components/callout";
 
 // Import ekstensi kustom
 import {
@@ -96,7 +84,7 @@ import {
 } from "@/components/ui/tooltip";
 
 // Custom heading toolbar component
-const HeadingToolbar = ({ editor }: { editor: any }) => {
+const HeadingToolbar = ({ editor }: { editor: Editor }) => {
   const currentLevel = editor.getAttributes("heading").level || 0;
 
   return (
@@ -119,7 +107,7 @@ const HeadingToolbar = ({ editor }: { editor: any }) => {
         >
           Normal Text
         </DropdownMenuItem>
-        {[1, 2, 3, 4].map((level) => (
+        {([1, 2, 3, 4] as const).map((level) => (
           <DropdownMenuItem
             key={level}
             onClick={() =>
@@ -136,7 +124,7 @@ const HeadingToolbar = ({ editor }: { editor: any }) => {
 };
 
 // New components for extended toolbars
-const TabsToolbar = ({ editor }: { editor: any }) => {
+const TabsToolbar = ({ editor }: { editor: Editor }) => {
   return (
     <Button
       variant="ghost"
@@ -195,7 +183,7 @@ const TabsToolbar = ({ editor }: { editor: any }) => {
   );
 };
 
-const AccordionToolbar = ({ editor }: { editor: any }) => {
+const AccordionToolbar = ({ editor }: { editor: Editor }) => {
   return (
     <Button
       variant="ghost"
@@ -230,7 +218,7 @@ const AccordionToolbar = ({ editor }: { editor: any }) => {
   );
 };
 
-const CardsToolbar = ({ editor }: { editor: any }) => {
+const CardsToolbar = ({ editor }: { editor: Editor }) => {
   const insertSingleCard = () => {
     const card = {
       type: "card",

@@ -1,6 +1,35 @@
 import type { Attrs, Node } from "@tiptap/pm/model"
 import type { Editor } from "@tiptap/react"
 
+export const NODE_HANDLES_SELECTED_STYLE_CLASSNAME = "node-selected-style"
+
+export function isValidUrl(url: string): boolean {
+  try {
+    new URL(url)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function duplicateContent(editor: Editor): boolean {
+  try {
+    const { state } = editor
+    const { tr } = state
+    const { selection } = tr
+    const { from, to } = selection
+
+    const slice = state.doc.slice(from, to)
+    tr.insert(to, slice.content)
+
+    editor.view.dispatch(tr)
+    return true
+  } catch (error) {
+    console.error("Error duplicating content:", error)
+    return false
+  }
+}
+
 export const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 
 /**
@@ -55,19 +84,6 @@ export function getActiveMarkAttrs(
  */
 export function isEmptyNode(node?: Node | null): boolean {
   return !!node && node.content.size === 0
-}
-
-/**
- * Utility function to conditionally join class names into a single string.
- * Filters out falsey values like false, undefined, null, and empty strings.
- *
- * @param classes - List of class name strings or falsey values.
- * @returns A single space-separated string of valid class names.
- */
-export function cn(
-  ...classes: (string | boolean | undefined | null)[]
-): string {
-  return classes.filter(Boolean).join(" ")
 }
 
 /**

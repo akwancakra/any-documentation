@@ -6,10 +6,8 @@ import { ACTIVITY_LOG_MAX_ENTRIES, fileActivityRowToEntry } from "@/lib/activity
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session || (session.user as { role?: string })?.role !== "admin") {
-    return new Response(JSON.stringify({ message: "Unauthorized" }), {
-      status: 401,
-    });
+  if (!session || session.user?.role !== "admin") {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   try {

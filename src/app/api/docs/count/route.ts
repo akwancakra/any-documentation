@@ -7,9 +7,7 @@ import { scanMDXRelKeys } from "@/lib/mdx-utils";
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return new Response(JSON.stringify({ message: "Unauthorized" }), {
-      status: 401,
-    });
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   let total = 0;

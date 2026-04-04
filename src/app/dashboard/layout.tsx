@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Navbar } from "../(home)/_components/navbar";
+import { Navbar } from "@/components/shell/navbar";
 
 export const metadata = {
   title: "Dashboard | Any Documentation",
